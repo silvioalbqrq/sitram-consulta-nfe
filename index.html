@@ -44,7 +44,6 @@
 
 <main class="max-w-6xl mx-auto px-4 sm:px-8 mt-6 space-y-6">
 
-  <!-- Como usar -->
   <div class="bg-white rounded-2xl border border-slate-200 p-5 text-sm no-print">
     <h2 class="font-bold mb-2"><i class="fa-solid fa-circle-info text-slate-900 mr-1"></i>Como usar</h2>
     <ol class="list-decimal ml-5 space-y-1 text-slate-600">
@@ -64,7 +63,6 @@
     </div>
   </div>
 
-  <!-- Entrada -->
   <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 no-print">
     <div class="bg-white rounded-2xl border border-slate-200 p-5">
       <h2 class="font-bold mb-3"><i class="fa-solid fa-file-csv text-slate-900 mr-1"></i>1. Arquivo CSV / TXT</h2>
@@ -87,7 +85,6 @@
     </div>
   </div>
 
-  <!-- Chaves carregadas -->
   <div class="bg-white rounded-2xl border border-slate-200 p-5">
     <div class="flex flex-wrap items-center justify-between gap-3">
       <h2 class="font-bold"><i class="fa-solid fa-list-check text-slate-900 mr-1"></i>3. Chaves carregadas: <span id="countChaves">0</span></h2>
@@ -105,7 +102,6 @@
     <div id="log" class="mt-2 text-xs text-slate-500 no-print"></div>
   </div>
 
-  <!-- Resumo -->
   <div id="resumo" class="grid grid-cols-2 md:grid-cols-6 gap-3 hidden">
     <div class="bg-white rounded-xl border p-4 text-center"><div class="text-xs text-slate-500">TOTAL</div><div id="rTotal" class="text-2xl font-black">0</div></div>
     <div class="bg-white rounded-xl border border-emerald-300 p-4 text-center"><div class="text-xs text-emerald-700">PAGAS</div><div id="rPagas" class="text-2xl font-black text-emerald-700">0</div></div>
@@ -115,7 +111,6 @@
     <div class="bg-white rounded-xl border p-4 text-center"><div class="text-xs text-slate-500">ERROS</div><div id="rErros" class="text-2xl font-black text-slate-500">0</div></div>
   </div>
 
-  <!-- Resultado -->
   <div id="blocoResultado" class="bg-white rounded-2xl border border-slate-200 overflow-hidden">
     <div class="p-4 bg-slate-50 border-b flex flex-wrap items-center justify-between gap-2">
       <h2 class="font-bold"><i class="fa-solid fa-table text-slate-900 mr-1"></i>Resultado</h2>
@@ -156,9 +151,6 @@
   <footer class="text-center text-xs text-slate-400 no-print">Fonte dos dados: SITRAM/SEFAZ-CE · Uso via backend local (proxy) para respeitar CORS · Confira valores críticos no portal oficial.</footer>
 </main>
 
-<script>
-/* PLACEHOLDER_JS - will be updated */
-alert('Carregando JS completo...');
-</script>
+<script src="app.js"></script>
 </body>
 </html>
