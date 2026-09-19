@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Consulta NFe Interestadual — SITRAM/SEFAZ-CE</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+  body { font-family: 'Inter', system-ui, sans-serif; background: #f8fafc; }
+  .drop-active { border-color: #0f172a !important; background: #e2e8f0 !important; }
+  .badge-pago { background: #dcfce7; color: #166534; }
+  .badge-nao { background: #fee2e2; color: #991b1b; }
+  .badge-neutro { background: #f1f5f9; color: #475569; }
+  .badge-alerta { background: #fef9c3; color: #854d0e; }
+  #log { max-height: 140px; overflow-y: auto; }
+  @media print {
+    .no-print { display: none !important; }
+    body { background: #fff; padding-bottom: 0; }
+    main { max-width: 100%; margin: 0; padding: 0; }
+    #blocoResultado { border: none; }
+  }
+</style>
+</head>
+<body class="text-slate-800 pb-12">
+
+<header class="bg-[#0f172a] text-white py-10 px-4 sm:px-8 shadow">
+  <div class="max-w-6xl mx-auto flex flex-col md:flex-row justify-between gap-3 md:items-center">
+    <div class="flex items-center gap-3">
+      <i class="fa-solid fa-file-invoice text-3xl"></i>
+      <div>
+        <h1 class="text-xl sm:text-2xl font-extrabold">Consulta NFe Interestadual — SITRAM/SEFAZ-CE</h1>
+        <p class="text-sm text-slate-400">Lote por chave de acesso (44 dígitos) · Situação: paga ou não · Fonte: portal-sitram.sefaz.ce.gov.br</p>
+      </div>
+    </div>
+    <div class="flex items-center gap-2 text-xs no-print">
+      <label for="backendUrl" class="text-slate-400">Backend:</label>
+      <input id="backendUrl" placeholder="https://seu-app.up.railway.app" class="text-slate-800 px-2 py-1 rounded-lg w-64 text-xs" title="URL do backend (Railway ou local)">
+      <button type="button" id="btnSalvarBackend" class="px-2 py-1 rounded-lg bg-slate-600 hover:bg-slate-500 text-white text-xs" title="Salvar URL">Salvar</button>
+      <span id="backendStatus" class="px-2 py-1 rounded-full bg-slate-700 text-slate-200">não testado</span>
+    </div>
+  </div>
+</header>
+
+<main class="max-w-6xl mx-auto px-4 sm:px-8 mt-6 space-y-6">
+
+  <!-- Como usar -->
+  <div class="bg-white rounded-2xl border border-slate-200 p-5 text-sm no-print">
+    <h2 class="font-bold mb-2"><i class="fa-solid fa-circle-info text-slate-900 mr-1"></i>Como usar</h2>
+    <ol class="list-decimal ml-5 space-y-1 text-slate-600">
+      <li><strong>Online (recomendado):</strong> informe a URL do backend no Railway no campo <em>Backend</em> acima (ex.: <code class="bg-slate-100 px-1 rounded">https://seu-app.up.railway.app</code>) e clique em <strong>Salvar</strong>.</li>
+      <li><strong>Local:</strong> dê 2 cliques em <code class="bg-slate-100 px-1 rounded">iniciar_sitram.bat</code> — ele liga o backend em <code class="bg-slate-100 px-1 rounded">http://127.0.0.1:8001</code> e abre o site. Não feche a janela preta enquanto usar.</li>
+      <li>Envie o <strong>.csv ou .txt</strong> (o site localiza as chaves de 44 dígitos sozinho) ou cole as chaves.</li>
+      <li>Clique em <strong>Consultar lote</strong>.</li>
+      <li>Exporte o resultado em CSV ou imprima.</li>
+    </ol>
+    <div class="mt-3 bg-amber-50 border-l-4 border-amber-500 p-3 rounded-r-xl text-xs text-amber-900">
+      <strong>Entendendo o resultado (regra do SITRAM):</strong>
+      só aparece <strong>PAGA</strong> ou <strong>A PAGAR</strong> para nota <strong>selada</strong>.
+      <strong>PAGA</strong> = “Paga ou Parcelada ou Déb. Autuado” / imposto “Pago”.
+      <strong>A PAGAR</strong> = selada com imposto pendente (ex. “SUBT - A Pagar”).
+      <strong>SEM COBRANÇA</strong> = selada, sem imposto a recolher.
+      <strong>NÃO SELADA</strong> = portal responde “Não foram encontradas notas fiscais para esta consulta” — é preciso selar a nota (posto/trânsito) e só depois ela fica disponível para pagamento e nova consulta.
+    </div>
+  </div>
+
+  <!-- Entrada -->
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 no-print">
+    <div class="bg-white rounded-2xl border border-slate-200 p-5">
+      <h2 class="font-bold mb-3"><i class="fa-solid fa-file-csv text-slate-900 mr-1"></i>1. Arquivo CSV / TXT</h2>
+      <div id="dropzone" class="border-2 border-dashed border-slate-300 rounded-xl p-6 text-center cursor-pointer hover:border-slate-900 transition">
+        <i class="fa-solid fa-cloud-arrow-up text-3xl text-slate-400"></i>
+        <p class="text-sm mt-2">Arraste o <strong>.csv ou .txt</strong> aqui ou <span class="text-slate-900 font-bold underline">clique para selecionar</span></p>
+        <p class="text-xs text-slate-400 mt-1">Ex.: “Informações Fiscais - NF-e - Emissor … .csv” ou .txt com as chaves de 44 dígitos — o site localiza as chaves sozinho</p>
+        <input id="fileInput" type="file" accept=".csv,.txt,.CSV,.TXT" class="hidden">
+      </div>
+      <div id="fileInfo" class="text-xs text-slate-500 mt-2"></div>
+    </div>
+    <div class="bg-white rounded-2xl border border-slate-200 p-5">
+      <h2 class="font-bold mb-3"><i class="fa-solid fa-paste text-slate-900 mr-1"></i>2. Ou cole as chaves</h2>
+      <textarea id="pasteArea" rows="6" placeholder="Cole as chaves de 44 dígitos (uma por linha, ou separadas por ; , espaço)&#10;Ex.: 23260810891967000164550010000046531234579393" class="w-full text-xs font-mono border border-slate-300 rounded-xl p-3"></textarea>
+      <div class="flex gap-2 mt-2 flex-wrap">
+        <button onclick="usarTextoColado()" class="bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold px-4 py-2 rounded-lg"><i class="fa-solid fa-arrow-down mr-1"></i>Carregar texto</button>
+        <button onclick="adicionarChaveUnica()" class="bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold px-4 py-2 rounded-lg"><i class="fa-solid fa-plus mr-1"></i>Adicionar 1 chave</button>
+        <input id="chaveUnica" placeholder="chave única de 44 dígitos" class="flex-1 min-w-[200px] text-xs font-mono border border-slate-300 rounded-lg px-3 py-2">
+      </div>
+    </div>
+  </div>
+
+  <!-- Chaves carregadas -->
+  <div class="bg-white rounded-2xl border border-slate-200 p-5">
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <h2 class="font-bold"><i class="fa-solid fa-list-check text-slate-900 mr-1"></i>3. Chaves carregadas: <span id="countChaves">0</span></h2>
+      <div class="flex gap-2 flex-wrap no-print">
+        <button onclick="limparTudo()" class="bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-bold px-4 py-2 rounded-lg"><i class="fa-solid fa-trash mr-1"></i>Limpar</button>
+        <button onclick="imprimirResultado()" class="bg-white border border-slate-300 hover:bg-slate-50 text-slate-800 text-xs font-bold px-4 py-2 rounded-lg"><i class="fa-solid fa-print mr-1"></i>Imprimir Resultado</button>
+        <button id="btnConsultar" onclick="consultarLote()" class="bg-[#0f172a] hover:bg-[#1e293b] text-white text-sm font-bold px-6 py-2 rounded-lg disabled:opacity-50" disabled><i class="fa-solid fa-magnifying-glass mr-1"></i>Consultar lote no SITRAM</button>
+      </div>
+    </div>
+    <div id="chavesPreview" class="mt-3 text-xs font-mono text-slate-500 max-h-24 overflow-y-auto no-print"></div>
+    <div class="mt-3 no-print">
+      <div class="flex justify-between text-xs text-slate-500 mb-1"><span id="progressLabel">Aguardando consulta…</span><span id="progressPct"></span></div>
+      <div class="h-2 bg-slate-200 rounded-full overflow-hidden"><div id="progressBar" class="h-2 bg-[#0f172a] rounded-full transition-all" style="width:0%"></div></div>
+    </div>
+    <div id="log" class="mt-2 text-xs text-slate-500 no-print"></div>
+  </div>
+
+  <!-- Resumo -->
+  <div id="resumo" class="grid grid-cols-2 md:grid-cols-6 gap-3 hidden">
+    <div class="bg-white rounded-xl border p-4 text-center"><div class="text-xs text-slate-500">TOTAL</div><div id="rTotal" class="text-2xl font-black">0</div></div>
+    <div class="bg-white rounded-xl border border-emerald-300 p-4 text-center"><div class="text-xs text-emerald-700">PAGAS</div><div id="rPagas" class="text-2xl font-black text-emerald-700">0</div></div>
+    <div class="bg-white rounded-xl border border-rose-300 p-4 text-center"><div class="text-xs text-rose-700">A PAGAR</div><div id="rAPagar" class="text-2xl font-black text-rose-700">0</div></div>
+    <div class="bg-white rounded-xl border border-slate-300 p-4 text-center"><div class="text-xs text-slate-500">SEM COBRANÇA</div><div id="rSemCob" class="text-2xl font-black text-slate-600">0</div></div>
+    <div class="bg-white rounded-xl border border-amber-300 p-4 text-center"><div class="text-xs text-amber-700">NÃO SELADAS</div><div id="rNaoEnc" class="text-2xl font-black text-amber-700">0</div></div>
+    <div class="bg-white rounded-xl border p-4 text-center"><div class="text-xs text-slate-500">ERROS</div><div id="rErros" class="text-2xl font-black text-slate-500">0</div></div>
+  </div>
+
+  <!-- Resultado -->
+  <div id="blocoResultado" class="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+    <div class="p-4 bg-slate-50 border-b flex flex-wrap items-center justify-between gap-2">
+      <h2 class="font-bold"><i class="fa-solid fa-table text-slate-900 mr-1"></i>Resultado</h2>
+      <div class="flex gap-2 items-center flex-wrap text-xs no-print">
+        <select id="filtro" onchange="renderTabela()" class="border border-slate-300 rounded-lg px-2 py-1">
+          <option value="todas">Todas</option>
+          <option value="pagas">Pagas</option>
+          <option value="apagar">A pagar</option>
+          <option value="semcob">Sem cobrança</option>
+          <option value="nao">Não pagas (A pagar + Sem cobrança)</option>
+          <option value="naoenc">Não seladas</option>
+          <option value="erros">Erros</option>
+        </select>
+        <button onclick="exportarCSV()" class="bg-[#0f172a] hover:bg-[#1e293b] text-white font-bold px-4 py-1.5 rounded-lg"><i class="fa-solid fa-file-csv mr-1"></i>Exportar CSV</button>
+      </div>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-xs text-left">
+        <thead class="bg-slate-900 text-white uppercase text-[11px]">
+          <tr>
+            <th class="px-3 py-2">Chave de acesso</th>
+            <th class="px-3 py-2">NF-e</th>
+            <th class="px-3 py-2">Situação NF</th>
+            <th class="px-3 py-2">Situação imposto</th>
+            <th class="px-3 py-2">Status</th>
+            <th class="px-3 py-2">Emitente</th>
+            <th class="px-3 py-2">Destinatário</th>
+            <th class="px-3 py-2">Fato gerador</th>
+            <th class="px-3 py-2">Valor R$</th>
+          </tr>
+        </thead>
+        <tbody id="tbody" class="divide-y divide-slate-200"></tbody>
+      </table>
+    </div>
+    <p class="text-[11px] text-slate-400 px-4 py-2">Regra: <strong>PAGA</strong> = “Paga/Parcelada/Déb. autuado” ou imposto “Pago”. <strong>A PAGAR</strong> = selada com imposto pendente. <strong>SEM COBRANÇA</strong> = selada, sem imposto a recolher. <strong>NÃO SELADA</strong> = portal responde “Não foram encontradas notas fiscais” — sele a nota e consulte de novo (NF cancelada também cai aqui).</p>
+  </div>
+
+  <footer class="text-center text-xs text-slate-400 no-print">Fonte dos dados: SITRAM/SEFAZ-CE · Uso via backend local (proxy) para respeitar CORS · Confira valores críticos no portal oficial.</footer>
+</main>
+
+<script>
+/* PLACEHOLDER_JS - will be updated */
+alert('Carregando JS completo...');
+</script>
+</body>
+</html>
