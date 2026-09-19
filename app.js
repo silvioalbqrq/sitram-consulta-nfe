@@ -4,9 +4,8 @@ let RESULTADOS = [];
 const $ = id => document.getElementById(id);
 const soDigitos = s => (s || '').replace(/\D/g, '');
 const LS_KEY = 'sitram_backend_url';
-const LS_MODE = 'sitram_backend_mode'; // 'online' | 'local' | 'custom'
+const LS_MODE = 'sitram_backend_mode';
 
-// URLs fixas
 const URL_ONLINE = 'https://sitram-consulta-nfe-production.up.railway.app';
 const URL_LOCAL = 'http://127.0.0.1:8001';
 
@@ -93,6 +92,7 @@ async function pingBackend() {
       if (r.ok) {
         $('backendStatus').textContent = 'online';
         $('backendStatus').className = 'px-2 py-1 rounded-full bg-emerald-600 text-white';
+        if (typeof verificarSaudeApiSitram === 'function') setTimeout(verificarSaudeApiSitram, 100);
         return true;
       }
     } catch (e) { /* tenta a proxima */ }
@@ -118,7 +118,59 @@ async function pingBackend() {
   $('backendUrl').addEventListener('keydown', e => { if (e.key === 'Enter') salvarBackendUrl(); });
 })();
 
-// ---------- entrada: arquivo ----------
+async function verificarSaudeApiSitram() {
+  const box = $('alertaApiSitram');
+  const tit = $('alertaApiTitulo');
+  const msg = $('alertaApiMsg');
+  if (!box) return;
+  try {
+    const r = await fetch(backend() + '/api/sitram/health', { mode: 'cors' });
+    if (!r.ok) {
+      box.className = 'no-print rounded-2xl border p-4 text-sm border-rose-300 bg-rose-50 text-rose-900';
+      tit.textContent = 'Não foi possível verificar a API SITRAM';
+      msg.textContent = 'O backend respondeu HTTP ' + r.status + '. Confira se o Railway/local está no ar.';
+      box.classList.remove('hidden');
+      return;
+    }
+    const h = await r.json();
+    if (h.ok && h.saude === 'OK') {
+      box.classList.add('hidden');
+      return;
+    }
+    const mapa = {
+      ALTERADA: {
+        cls: 'no-print rounded-2xl border p-4 text-sm border-amber-400 bg-amber-50 text-amber-950',
+        titulo: 'Atenção: a API do SITRAM parece ter sido alterada',
+      },
+      BLOQUEADA: {
+        cls: 'no-print rounded-2xl border p-4 text-sm border-rose-300 bg-rose-50 text-rose-900',
+        titulo: 'API SITRAM bloqueou o acesso',
+      },
+      INDISPONIVEL: {
+        cls: 'no-print rounded-2xl border p-4 text-sm border-rose-300 bg-rose-50 text-rose-900',
+        titulo: 'API SITRAM indisponível no momento',
+      },
+    };
+    const info = mapa[h.saude] || {
+      cls: 'no-print rounded-2xl border p-4 text-sm border-amber-400 bg-amber-50 text-amber-950',
+      titulo: 'Problema ao consultar a API SITRAM',
+    };
+    box.className = info.cls;
+    tit.textContent = info.titulo;
+    msg.textContent = (h.mensagem || '') + (h.http != null ? ' (HTTP ' + h.http + ')' : '');
+    box.classList.remove('hidden');
+  } catch (e) {
+    box.className = 'no-print rounded-2xl border p-4 text-sm border-slate-300 bg-slate-50 text-slate-800';
+    tit.textContent = 'Não foi possível verificar a API SITRAM';
+    msg.textContent = 'Falha de rede ao falar com o backend. Confira se está Online/Local.';
+    box.classList.remove('hidden');
+  }
+}
+
+$('btnRecheckApi')?.addEventListener('click', verificarSaudeApiSitram);
+setTimeout(verificarSaudeApiSitram, 800);
+setInterval(verificarSaudeApiSitram, 10 * 60 * 1000);
+
 const dz = $('dropzone'), fi = $('fileInput');
 dz.onclick = () => fi.click();
 ['dragover', 'dragenter'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.add('drop-active'); }));
