@@ -34,8 +34,10 @@
       </div>
     </div>
     <div class="flex items-center gap-2 text-xs no-print">
-      <label for="backendUrl" class="text-slate-400">Backend:</label>
-      <input id="backendUrl" placeholder="https://seu-app.up.railway.app" class="text-slate-800 px-2 py-1 rounded-lg w-64 text-xs" title="URL do backend (Railway ou local)">
+      <label class="text-slate-400">Backend:</label>
+      <button type="button" id="btnModoOnline" class="px-2 py-1 rounded-lg bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-bold" title="Usar Railway">Online</button>
+      <button type="button" id="btnModoLocal" class="px-2 py-1 rounded-lg bg-slate-600 hover:bg-slate-500 text-white text-xs font-bold" title="Usar backend local">Local</button>
+      <input id="backendUrl" placeholder="URL do backend" class="text-slate-800 px-2 py-1 rounded-lg w-56 text-xs" title="URL do backend">
       <button type="button" id="btnSalvarBackend" class="px-2 py-1 rounded-lg bg-slate-600 hover:bg-slate-500 text-white text-xs" title="Salvar URL">Salvar</button>
       <span id="backendStatus" class="px-2 py-1 rounded-full bg-slate-700 text-slate-200">não testado</span>
     </div>
@@ -47,8 +49,8 @@
   <div class="bg-white rounded-2xl border border-slate-200 p-5 text-sm no-print">
     <h2 class="font-bold mb-2"><i class="fa-solid fa-circle-info text-slate-900 mr-1"></i>Como usar</h2>
     <ol class="list-decimal ml-5 space-y-1 text-slate-600">
-      <li><strong>Online (recomendado):</strong> informe a URL do backend no Railway no campo <em>Backend</em> acima (ex.: <code class="bg-slate-100 px-1 rounded">https://seu-app.up.railway.app</code>) e clique em <strong>Salvar</strong>.</li>
-      <li><strong>Local:</strong> dê 2 cliques em <code class="bg-slate-100 px-1 rounded">iniciar_sitram.bat</code> — ele liga o backend em <code class="bg-slate-100 px-1 rounded">http://127.0.0.1:8001</code> e abre o site. Não feche a janela preta enquanto usar.</li>
+      <li><strong>Online:</strong> clique em <strong>Online</strong> (usa o Railway automaticamente). Status deve ficar verde.</li>
+      <li><strong>Local:</strong> clique em <strong>Local</strong> e rode o <code class="bg-slate-100 px-1 rounded">iniciar_sitram.bat</code> no PC. Não feche a janela preta enquanto usar.</li>
       <li>Envie o <strong>.csv ou .txt</strong> (o site localiza as chaves de 44 dígitos sozinho) ou cole as chaves.</li>
       <li>Clique em <strong>Consultar lote</strong>.</li>
       <li>Exporte o resultado em CSV ou imprima.</li>
