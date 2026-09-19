@@ -23,6 +23,7 @@ from pydantic import BaseModel
 
 BASE_DIR = Path(__file__).resolve().parent
 HTML_FILE = BASE_DIR / "index.html"
+APP_JS_FILE = BASE_DIR / "app.js"
 
 SITRAM_API = "https://portal-sitram.sefaz.ce.gov.br/api-nota/notafiscal/por-chave-de-acesso"
 UA = {"User-Agent": "Mozilla/5.0", "Accept": "application/json"}
@@ -86,8 +87,6 @@ def consulta_sitram(chave: str, timeout: int = 20) -> dict:
             payload = json.loads(r.read().decode("utf-8", errors="ignore"))
     except urllib.error.HTTPError as e:
         if e.code == 404:
-            # Mesmo modal do portal: "Nao foram encontradas notas fiscais para
-            # esta consulta" = chave ainda NAO SELADA (selar antes de pagar).
             return {"chave": chave, "ok": True, "encontrada": False,
                     "erro": None, "pago": None, "status": "NAO_ENCONTRADA",
                     "acao": "nao selada: selar no posto / aguardar transito e consultar de novo"}
@@ -136,18 +135,25 @@ def consulta_sitram(chave: str, timeout: int = 20) -> dict:
 
 @app.get("/", include_in_schema=False)
 def site():
-    # O backend serve o proprio site: basta abrir http://127.0.0.1:8001/
-    # (mesma origem = sem problema de CORS e sem configurar URL).
+    # O backend serve o proprio site: basta abrir a URL do Railway ou http://127.0.0.1:8001/
     if HTML_FILE.exists():
         return FileResponse(str(HTML_FILE), media_type="text/html")
     return {"status": "backend SITRAM no ar (arquivo index.html nao encontrado ao lado do backend)",
             "docs": "/docs"}
 
 
+@app.get("/app.js", include_in_schema=False)
+def app_js():
+    # Necessario no Railway: o index.html carrega /app.js
+    if APP_JS_FILE.exists():
+        return FileResponse(str(APP_JS_FILE), media_type="application/javascript")
+    return {"erro": "app.js nao encontrado"}
+
+
 @app.get("/api/status")
 def status():
     return {"status": "backend SITRAM no ar", "docs": "/docs",
-            "site": "http://127.0.0.1:8001/"}
+            "site": "/"}
 
 
 @app.get("/api/sitram/consulta")
@@ -197,7 +203,6 @@ def consultar_lote(lote: LoteIn):
             resultados = [uma(c) for c in fila]
         else:
             with ThreadPoolExecutor(max_workers=workers) as ex:
-                # map preserva a ordem da fila
                 resultados = list(ex.map(uma, fila))
 
     todos = invalidas + resultados
