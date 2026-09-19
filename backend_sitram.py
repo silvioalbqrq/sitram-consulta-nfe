@@ -23,10 +23,13 @@ from pydantic import BaseModel
 
 BASE_DIR = Path(__file__).resolve().parent
 HTML_FILE = BASE_DIR / "index.html"
-APP_JS_FILE = BASE_DIR / "app.js"
 
 SITRAM_API = "https://portal-sitram.sefaz.ce.gov.br/api-nota/notafiscal/por-chave-de-acesso"
 UA = {"User-Agent": "Mozilla/5.0", "Accept": "application/json"}
+
+# Regra interestadual: SITRAM-CE só para emitente de fora do CE.
+# cUF = 2 primeiros dígitos da chave. 23 = Ceará -> NÃO consultar.
+CUF_CE = "23"
 
 app = FastAPI(title="VMF Consulta SITRAM NFe")
 app.add_middleware(
@@ -50,8 +53,37 @@ def valida_chave(chave: str) -> Optional[str]:
     return None
 
 
+def eh_ceara(chave: str) -> bool:
+    """cUF 23 = emitente do Ceará. Não consultar no SITRAM (só interestadual)."""
+    return (chave or "")[:2] == CUF_CE
+
+
+def resposta_ceara(chave: str) -> dict:
+    return {"chave": chave, "ok": True, "encontrada": None,
+            "erro": None, "pago": None, "status": "CEARA",
+            "cuf": CUF_CE, "uf_emitente": "CE",
+            "numero": None, "selo": None,
+            "situacao_nf": "Emitente do Ceará",
+            "situacao_imposto": "—",
+            "acao": "nota de emitente do Ceará (cUF 23): não consultar no SITRAM. "
+                    "SITRAM é só para interestadual. Se a NF-e estiver Autorizada, "
+                    "verifique no emissor/SEFAZ-CE."}
+
+
 def classifica_status(situacao_nf: str, situacao_imposto: str) -> tuple:
-    """Classifica a partir dos rotulos observados no portal SITRAM."""
+    """Classifica a partir dos rotulos observados no portal SITRAM.
+
+    Status observados na API (campo numerico `situacao` + descricao):
+    - 20 / 'A Pagar'                       -> A_PAGAR (selada, imposto pendente)
+    - 30 / 'Paga ou Parcelada ou Deb.Autuado' (+ 'SUBT/ANTC - Pago') -> PAGA
+    - 40 / 'Sem Cobranca'                  -> SEM_COBRANCA (selada, sem imposto a recolher)
+    - HTTP 404 / lista vazia               -> NAO_ENCONTRADA (nao selada: precisa
+      selar no posto / aguardar o transito; so depois fica disponivel p/ pagar)
+
+    ATENCAO a ordem dos testes: 'A Pagar' contem o trecho 'paga', por isso o
+    teste de 'a pagar' vem ANTES do teste de 'paga'.
+    Retorna (status, pago_bool).
+    """
     nf = (situacao_nf or "").lower()
     imp = (situacao_imposto or "").lower()
     if "a pagar" in nf or "a pagar" in imp:
@@ -68,6 +100,8 @@ def classifica_status(situacao_nf: str, situacao_imposto: str) -> tuple:
 
 
 def consulta_sitram(chave: str, timeout: int = 20) -> dict:
+    if eh_ceara(chave):
+        return resposta_ceara(chave)
     url = f"{SITRAM_API}/{chave}?page=0&size=25"
     req = urllib.request.Request(url, headers=UA)
     try:
@@ -75,6 +109,8 @@ def consulta_sitram(chave: str, timeout: int = 20) -> dict:
             payload = json.loads(r.read().decode("utf-8", errors="ignore"))
     except urllib.error.HTTPError as e:
         if e.code == 404:
+            # Mesmo modal do portal: "Nao foram encontradas notas fiscais para
+            # esta consulta" = chave ainda NAO SELADA (selar antes de pagar).
             return {"chave": chave, "ok": True, "encontrada": False,
                     "erro": None, "pago": None, "status": "NAO_ENCONTRADA",
                     "acao": "nao selada: selar no posto / aguardar transito e consultar de novo"}
@@ -123,6 +159,8 @@ def consulta_sitram(chave: str, timeout: int = 20) -> dict:
 
 @app.get("/", include_in_schema=False)
 def site():
+    # O backend serve o proprio site: basta abrir http://127.0.0.1:8001/
+    # (mesma origem = sem problema de CORS e sem configurar URL).
     if HTML_FILE.exists():
         return FileResponse(str(HTML_FILE), media_type="text/html")
     return {"status": "backend SITRAM no ar (arquivo index.html nao encontrado ao lado do backend)",
@@ -131,86 +169,37 @@ def site():
 
 @app.get("/app.js", include_in_schema=False)
 def app_js():
-    if APP_JS_FILE.exists():
-        return FileResponse(str(APP_JS_FILE), media_type="application/javascript")
+    # Espelho do JS inline (p/ compatibilidade se o index referenciar app.js)
+    f = BASE_DIR / "app.js"
+    if f.exists():
+        return FileResponse(str(f), media_type="application/javascript")
     return {"erro": "app.js nao encontrado"}
 
 
 @app.get("/api/status")
 def status():
-    return {"status": "backend SITRAM no ar", "docs": "/docs", "site": "/"}
-
-
-def verificar_api_sitram(timeout: int = 15) -> dict:
-    """Sonda a API do portal SITRAM e classifica saude."""
-    chave_teste = "23200100000000000000550010000000011000000010"
-    url = f"{SITRAM_API}/{chave_teste}?page=0&size=1"
-    req = urllib.request.Request(url, headers=UA)
-    try:
-        with urllib.request.urlopen(req, timeout=timeout) as r:
-            raw = r.read()
-            ctype = (r.headers.get("Content-Type") or "").lower()
-            code = getattr(r, "status", 200)
-    except urllib.error.HTTPError as e:
-        code = e.code
-        raw = b""
-        ctype = ((e.headers.get("Content-Type") if e.headers else "") or "").lower()
-        try:
-            raw = e.read()[:2000]
-        except Exception:
-            pass
-        if code == 404:
-            return {"ok": True, "saude": "OK",
-                    "mensagem": "API SITRAM respondeu normalmente (404 para chave de teste).",
-                    "http": code, "detalhe": None}
-        if code in (401, 403):
-            return {"ok": False, "saude": "BLOQUEADA",
-                    "mensagem": "API SITRAM recusou acesso (401/403). Pode ter mudado autenticacao ou bloqueado o IP.",
-                    "http": code, "detalhe": raw[:300].decode("utf-8", errors="ignore")}
-        if code >= 500:
-            return {"ok": False, "saude": "INDISPONIVEL",
-                    "mensagem": f"API SITRAM com erro de servidor (HTTP {code}). Tente mais tarde.",
-                    "http": code, "detalhe": raw[:300].decode("utf-8", errors="ignore")}
-        texto = raw[:500].decode("utf-8", errors="ignore")
-        if "html" in ctype or texto.lstrip().lower().startswith("<!doctype") or "<html" in texto.lower():
-            return {"ok": False, "saude": "ALTERADA",
-                    "mensagem": "API SITRAM parece ter sido alterada (resposta HTML em vez de JSON).",
-                    "http": code, "detalhe": texto[:200]}
-        return {"ok": False, "saude": "ALTERADA",
-                "mensagem": f"API SITRAM respondeu de forma inesperada (HTTP {code}).",
-                "http": code, "detalhe": texto[:200]}
-    except Exception as e:
-        return {"ok": False, "saude": "INDISPONIVEL",
-                "mensagem": f"Nao foi possivel contatar a API SITRAM: {e}",
-                "http": None, "detalhe": str(e)[:200]}
-
-    texto = raw.decode("utf-8", errors="ignore")
-    if "html" in ctype or texto.lstrip().lower().startswith("<!doctype") or "<html" in texto.lower():
-        return {"ok": False, "saude": "ALTERADA",
-                "mensagem": "API SITRAM parece ter sido alterada (resposta HTML em vez de JSON).",
-                "http": code, "detalhe": texto[:200]}
-    try:
-        payload = json.loads(texto)
-    except Exception:
-        return {"ok": False, "saude": "ALTERADA",
-                "mensagem": "API SITRAM parece ter sido alterada (corpo nao e JSON valido).",
-                "http": code, "detalhe": texto[:200]}
-    if isinstance(payload, dict) and "content" in payload:
-        return {"ok": True, "saude": "OK",
-                "mensagem": "API SITRAM no formato esperado.", "http": code, "detalhe": None}
-    if isinstance(payload, list):
-        return {"ok": True, "saude": "OK",
-                "mensagem": "API SITRAM respondeu lista JSON (formato aceito).", "http": code, "detalhe": None}
-    return {"ok": False, "saude": "ALTERADA",
-            "mensagem": "API SITRAM respondeu JSON, mas sem o campo 'content' esperado. Pode ter mudado o contrato.",
-            "http": code,
-            "detalhe": str(list(payload.keys())[:12]) if isinstance(payload, dict) else type(payload).__name__}
+    return {"status": "backend SITRAM no ar", "docs": "/docs",
+            "site": "http://127.0.0.1:8001/"}
 
 
 @app.get("/api/sitram/health")
-def health_sitram():
-    """Monitora se a API do portal SITRAM ainda responde no formato conhecido."""
-    return verificar_api_sitram()
+def saude_api():
+    # Sonda leve da API SITRAM: qualquer HTTP (mesmo 404) = API alcançável.
+    sonda = f"{SITRAM_API}/{'0' * 44}?page=0&size=1"
+    try:
+        req = urllib.request.Request(sonda, headers=UA)
+        try:
+            with urllib.request.urlopen(req, timeout=10) as r:
+                r.read(512)
+            return {"ok": True, "saude": "OK", "mensagem": "API SITRAM alcançável.", "http": 200}
+        except urllib.error.HTTPError as e:
+            if e.code in (400, 404, 422):
+                return {"ok": True, "saude": "OK", "mensagem": "API SITRAM alcançável.", "http": e.code}
+            if e.code in (401, 403):
+                return {"ok": True, "saude": "BLOQUEADA", "mensagem": "API SITRAM bloqueou o acesso.", "http": e.code}
+            return {"ok": True, "saude": "ALTERADA", "mensagem": f"API SITRAM respondeu HTTP {e.code} inesperado.", "http": e.code}
+    except Exception as e:
+        return {"ok": False, "saude": "INDISPONIVEL", "mensagem": f"API SITRAM indisponível: {e}"[:300], "http": None}
 
 
 @app.get("/api/sitram/consulta")
@@ -219,6 +208,8 @@ def consultar_uma(chave: str = Query(..., description="Chave de acesso com 44 di
     err = valida_chave(c)
     if err:
         return {"chave": c, "ok": False, "erro": err, "pago": None, "status": "INVALIDA"}
+    if eh_ceara(c):
+        return resposta_ceara(c)
     return consulta_sitram(c)
 
 
@@ -231,7 +222,8 @@ class LoteIn(BaseModel):
 
 @app.post("/api/sitram/lote")
 def consultar_lote(lote: LoteIn):
-    vistas, fila, invalidas = set(), [], []
+    # normaliza + deduplica preservando ordem + separa CE (cUF 23)
+    vistas, fila, invalidas, ceara = set(), [], [], []
     for bruta in lote.chaves:
         c = somente_digitos(bruta)
         if not c or c in vistas:
@@ -242,6 +234,8 @@ def consultar_lote(lote: LoteIn):
             invalidas.append({"chave": c or bruta, "ok": False,
                               "erro": err, "pago": None,
                               "encontrada": None, "status": "INVALIDA"})
+        elif eh_ceara(c):
+            ceara.append(resposta_ceara(c))
         else:
             fila.append(c)
 
@@ -259,9 +253,10 @@ def consultar_lote(lote: LoteIn):
             resultados = [uma(c) for c in fila]
         else:
             with ThreadPoolExecutor(max_workers=workers) as ex:
+                # map preserva a ordem da fila
                 resultados = list(ex.map(uma, fila))
 
-    todos = invalidas + resultados
+    todos = invalidas + ceara + resultados
     pagas = sum(1 for r in todos if r.get("status") == "PAGA")
     a_pagar = sum(1 for r in todos if r.get("status") == "A_PAGAR")
     sem_cobranca = sum(1 for r in todos if r.get("status") == "SEM_COBRANCA")
@@ -270,7 +265,9 @@ def consultar_lote(lote: LoteIn):
     nao_encontradas = sum(1 for r in todos
                           if r.get("ok") and r.get("encontrada") is False)
     erros = sum(1 for r in todos if not r.get("ok"))
+    ceara_n = sum(1 for r in todos if r.get("status") == "CEARA")
     return {"total": len(todos), "pagas": pagas, "a_pagar": a_pagar,
             "sem_cobranca": sem_cobranca, "nao_pagas": nao_pagas,
             "nao_encontradas": nao_encontradas, "erros": erros,
+            "ceara": ceara_n,
             "resultados": todos}
