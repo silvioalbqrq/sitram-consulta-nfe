@@ -1,0 +1,12 @@
+__pycache__/
+*.py[cod]
+*$py.class
+.env
+.venv/
+venv/
+*.log
+.DS_Store
+chrome-perfil-vmf/
+Downloads/
+XML_NFe/
+*.bak
