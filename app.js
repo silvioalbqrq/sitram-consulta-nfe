@@ -8,8 +8,9 @@ const LS_KEY = 'sitram_backend_url';
 // Detecta se estamos na mesma origem do backend (ex.: rodando via uvicorn local)
 function mesmaOrigemBackend() {
   const o = window.location.origin || '';
-  // Só considera "mesma origem" se for localhost/127.0.0.1 (uso local)
+  // Local OU quando o site e o backend estao na mesma URL (ex.: Railway)
   if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(o)) return o;
+  if (/railway\.app$/i.test(window.location.hostname || '')) return o;
   return null;
 }
 
