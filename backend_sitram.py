@@ -51,19 +51,7 @@ def valida_chave(chave: str) -> Optional[str]:
 
 
 def classifica_status(situacao_nf: str, situacao_imposto: str) -> tuple:
-    """Classifica a partir dos rotulos observados no portal SITRAM.
-
-    Status observados na API (campo numerico `situacao` + descricao):
-    - 20 / 'A Pagar'                       -> A_PAGAR (selada, imposto pendente)
-    - 30 / 'Paga ou Parcelada ou Deb.Autuado' (+ 'SUBT/ANTC - Pago') -> PAGA
-    - 40 / 'Sem Cobranca'                  -> SEM_COBRANCA (selada, sem imposto a recolher)
-    - HTTP 404 / lista vazia               -> NAO_ENCONTRADA (nao selada: precisa
-      selar no posto / aguardar o transito; so depois fica disponivel p/ pagar)
-
-    ATENCAO a ordem dos testes: 'A Pagar' contem o trecho 'paga', por isso o
-    teste de 'a pagar' vem ANTES do teste de 'paga'.
-    Retorna (status, pago_bool).
-    """
+    """Classifica a partir dos rotulos observados no portal SITRAM."""
     nf = (situacao_nf or "").lower()
     imp = (situacao_imposto or "").lower()
     if "a pagar" in nf or "a pagar" in imp:
@@ -135,7 +123,6 @@ def consulta_sitram(chave: str, timeout: int = 20) -> dict:
 
 @app.get("/", include_in_schema=False)
 def site():
-    # O backend serve o proprio site: basta abrir a URL do Railway ou http://127.0.0.1:8001/
     if HTML_FILE.exists():
         return FileResponse(str(HTML_FILE), media_type="text/html")
     return {"status": "backend SITRAM no ar (arquivo index.html nao encontrado ao lado do backend)",
@@ -144,7 +131,6 @@ def site():
 
 @app.get("/app.js", include_in_schema=False)
 def app_js():
-    # Necessario no Railway: o index.html carrega /app.js
     if APP_JS_FILE.exists():
         return FileResponse(str(APP_JS_FILE), media_type="application/javascript")
     return {"erro": "app.js nao encontrado"}
@@ -152,8 +138,79 @@ def app_js():
 
 @app.get("/api/status")
 def status():
-    return {"status": "backend SITRAM no ar", "docs": "/docs",
-            "site": "/"}
+    return {"status": "backend SITRAM no ar", "docs": "/docs", "site": "/"}
+
+
+def verificar_api_sitram(timeout: int = 15) -> dict:
+    """Sonda a API do portal SITRAM e classifica saude."""
+    chave_teste = "23200100000000000000550010000000011000000010"
+    url = f"{SITRAM_API}/{chave_teste}?page=0&size=1"
+    req = urllib.request.Request(url, headers=UA)
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            raw = r.read()
+            ctype = (r.headers.get("Content-Type") or "").lower()
+            code = getattr(r, "status", 200)
+    except urllib.error.HTTPError as e:
+        code = e.code
+        raw = b""
+        ctype = ((e.headers.get("Content-Type") if e.headers else "") or "").lower()
+        try:
+            raw = e.read()[:2000]
+        except Exception:
+            pass
+        if code == 404:
+            return {"ok": True, "saude": "OK",
+                    "mensagem": "API SITRAM respondeu normalmente (404 para chave de teste).",
+                    "http": code, "detalhe": None}
+        if code in (401, 403):
+            return {"ok": False, "saude": "BLOQUEADA",
+                    "mensagem": "API SITRAM recusou acesso (401/403). Pode ter mudado autenticacao ou bloqueado o IP.",
+                    "http": code, "detalhe": raw[:300].decode("utf-8", errors="ignore")}
+        if code >= 500:
+            return {"ok": False, "saude": "INDISPONIVEL",
+                    "mensagem": f"API SITRAM com erro de servidor (HTTP {code}). Tente mais tarde.",
+                    "http": code, "detalhe": raw[:300].decode("utf-8", errors="ignore")}
+        texto = raw[:500].decode("utf-8", errors="ignore")
+        if "html" in ctype or texto.lstrip().lower().startswith("<!doctype") or "<html" in texto.lower():
+            return {"ok": False, "saude": "ALTERADA",
+                    "mensagem": "API SITRAM parece ter sido alterada (resposta HTML em vez de JSON).",
+                    "http": code, "detalhe": texto[:200]}
+        return {"ok": False, "saude": "ALTERADA",
+                "mensagem": f"API SITRAM respondeu de forma inesperada (HTTP {code}).",
+                "http": code, "detalhe": texto[:200]}
+    except Exception as e:
+        return {"ok": False, "saude": "INDISPONIVEL",
+                "mensagem": f"Nao foi possivel contatar a API SITRAM: {e}",
+                "http": None, "detalhe": str(e)[:200]}
+
+    texto = raw.decode("utf-8", errors="ignore")
+    if "html" in ctype or texto.lstrip().lower().startswith("<!doctype") or "<html" in texto.lower():
+        return {"ok": False, "saude": "ALTERADA",
+                "mensagem": "API SITRAM parece ter sido alterada (resposta HTML em vez de JSON).",
+                "http": code, "detalhe": texto[:200]}
+    try:
+        payload = json.loads(texto)
+    except Exception:
+        return {"ok": False, "saude": "ALTERADA",
+                "mensagem": "API SITRAM parece ter sido alterada (corpo nao e JSON valido).",
+                "http": code, "detalhe": texto[:200]}
+    if isinstance(payload, dict) and "content" in payload:
+        return {"ok": True, "saude": "OK",
+                "mensagem": "API SITRAM no formato esperado.", "http": code, "detalhe": None}
+    if isinstance(payload, list):
+        return {"ok": True, "saude": "OK",
+                "mensagem": "API SITRAM respondeu lista JSON (formato aceito).", "http": code, "detalhe": None}
+    return {"ok": False, "saude": "ALTERADA",
+            "mensagem": "API SITRAM respondeu JSON, mas sem o campo 'content' esperado. Pode ter mudado o contrato.",
+            "http": code,
+            "detalhe": str(list(payload.keys())[:12]) if isinstance(payload, dict) else type(payload).__name__}
+
+
+@app.get("/api/sitram/health")
+def health_sitram():
+    """Monitora se a API do portal SITRAM ainda responde no formato conhecido."""
+    return verificar_api_sitram()
 
 
 @app.get("/api/sitram/consulta")
@@ -174,7 +231,6 @@ class LoteIn(BaseModel):
 
 @app.post("/api/sitram/lote")
 def consultar_lote(lote: LoteIn):
-    # normaliza + deduplica preservando ordem
     vistas, fila, invalidas = set(), [], []
     for bruta in lote.chaves:
         c = somente_digitos(bruta)
