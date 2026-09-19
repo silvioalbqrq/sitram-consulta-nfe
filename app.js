@@ -4,25 +4,54 @@ let RESULTADOS = [];
 const $ = id => document.getElementById(id);
 const soDigitos = s => (s || '').replace(/\D/g, '');
 const LS_KEY = 'sitram_backend_url';
+const LS_MODE = 'sitram_backend_mode'; // 'online' | 'local' | 'custom'
 
-// Detecta se estamos na mesma origem do backend (ex.: rodando via uvicorn local)
+// URLs fixas
+const URL_ONLINE = 'https://sitram-consulta-nfe-production.up.railway.app';
+const URL_LOCAL = 'http://127.0.0.1:8001';
+
 function mesmaOrigemBackend() {
   const o = window.location.origin || '';
-  // Local OU quando o site e o backend estao na mesma URL (ex.: Railway)
   if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(o)) return o;
   if (/railway\.app$/i.test(window.location.hostname || '')) return o;
   return null;
 }
 
+function detectarModoInicial() {
+  const salvo = localStorage.getItem(LS_MODE);
+  if (salvo === 'online' || salvo === 'local' || salvo === 'custom') return salvo;
+  const host = (window.location.hostname || '').toLowerCase();
+  if (host.includes('github.io') || host.includes('railway.app')) return 'online';
+  if (host === 'localhost' || host === '127.0.0.1') return 'local';
+  return 'online';
+}
+
+function urlDoModo(modo) {
+  if (modo === 'local') return URL_LOCAL;
+  if (modo === 'online') return URL_ONLINE;
+  const saved = (localStorage.getItem(LS_KEY) || '').trim().replace(/\/$/, '');
+  return saved || URL_ONLINE;
+}
+
+function aplicarModo(modo, persistir) {
+  const url = urlDoModo(modo);
+  $('backendUrl').value = url;
+  if (persistir) {
+    localStorage.setItem(LS_MODE, modo);
+    localStorage.setItem(LS_KEY, url);
+  }
+  const on = $('btnModoOnline'), off = $('btnModoLocal');
+  if (on && off) {
+    on.className = 'px-2 py-1 rounded-lg text-xs font-bold ' +
+      (modo === 'online' ? 'bg-emerald-600 text-white' : 'bg-slate-600 hover:bg-slate-500 text-white');
+    off.className = 'px-2 py-1 rounded-lg text-xs font-bold ' +
+      (modo === 'local' ? 'bg-emerald-600 text-white' : 'bg-slate-600 hover:bg-slate-500 text-white');
+  }
+  pingBackend();
+}
+
 function defaultBackendUrl() {
-  // 1) localStorage (Railway ou local salvo pelo usuário)
-  const saved = (localStorage.getItem(LS_KEY) || '').trim();
-  if (saved) return saved.replace(/\/$/, '');
-  // 2) mesma origem local (uvicorn servindo o HTML)
-  const same = mesmaOrigemBackend();
-  if (same) return same;
-  // 3) padrão local
-  return 'http://127.0.0.1:8001';
+  return urlDoModo(detectarModoInicial());
 }
 
 const backend = () => {
@@ -43,11 +72,17 @@ function salvarBackendUrl() {
     return;
   }
   localStorage.setItem(LS_KEY, v);
+  if (v === URL_ONLINE || v.replace(/\/$/, '') === URL_ONLINE) {
+    localStorage.setItem(LS_MODE, 'online');
+  } else if (v === URL_LOCAL || v.includes('127.0.0.1') || v.includes('localhost')) {
+    localStorage.setItem(LS_MODE, 'local');
+  } else {
+    localStorage.setItem(LS_MODE, 'custom');
+  }
   log('URL do backend salva: ' + v);
   pingBackend();
 }
 
-// ---------- backend status ----------
 async function pingBackend() {
   const base = backend();
   if (!$('backendUrl').value.trim()) $('backendUrl').value = base;
@@ -70,11 +105,18 @@ async function pingBackend() {
   return false;
 }
 
-$('backendUrl').value = defaultBackendUrl();
-$('backendUrl').addEventListener('change', pingBackend);
-$('btnSalvarBackend').addEventListener('click', salvarBackendUrl);
-$('backendUrl').addEventListener('keydown', e => { if (e.key === 'Enter') salvarBackendUrl(); });
-pingBackend();
+(function initBackendUI() {
+  const modo = detectarModoInicial();
+  aplicarModo(modo, false);
+  $('btnModoOnline')?.addEventListener('click', () => aplicarModo('online', true));
+  $('btnModoLocal')?.addEventListener('click', () => aplicarModo('local', true));
+  $('backendUrl').addEventListener('change', () => {
+    localStorage.setItem(LS_MODE, 'custom');
+    pingBackend();
+  });
+  $('btnSalvarBackend').addEventListener('click', salvarBackendUrl);
+  $('backendUrl').addEventListener('keydown', e => { if (e.key === 'Enter') salvarBackendUrl(); });
+})();
 
 // ---------- entrada: arquivo ----------
 const dz = $('dropzone'), fi = $('fileInput');
@@ -85,7 +127,6 @@ dz.addEventListener('drop', e => { if (e.dataTransfer.files.length) lerArquivo(e
 fi.addEventListener('change', () => { if (fi.files.length) lerArquivo(fi.files[0]); });
 
 function extrairChaves(texto) {
-  // aceita CSV com ; , " etc: encontra qualquer sequência de 44 dígitos
   const todas = texto.match(/\d{44}/g) || [];
   return [...new Set(todas)];
 }
@@ -130,11 +171,10 @@ function atualizarPainelChaves() {
   $('chavesPreview').textContent = CHAVES.slice(0, 200).join('\n') + (CHAVES.length > 200 ? `\n… +${CHAVES.length - 200}` : '');
 }
 
-// ---------- consulta em lote (GET individual, concorrência 4, progresso real) ----------
 let cancelado = false;
 async function consultarLote() {
   if (!CHAVES.length) return;
-  if (!await pingBackend()) { alert('Backend offline. Dê 2 cliques em iniciar_sitram.bat (na pasta do site) e tente de novo.'); return; }
+  if (!await pingBackend()) { alert('Backend offline. Clique em Online ou inicie o backend local.'); return; }
   RESULTADOS = [];
   cancelado = false;
   $('btnConsultar').disabled = true;
@@ -163,7 +203,6 @@ async function consultarLote() {
   }
   log(`Iniciando consulta de ${total} chave(s)…`);
   await Promise.all(Array.from({ length: Math.min(conc, total) }, worker));
-  // reordena conforme entrada
   const ordem = new Map(CHAVES.map((c, i) => [c, i]));
   RESULTADOS.sort((a, b) => (ordem.get(a.chave) ?? 0) - (ordem.get(b.chave) ?? 0));
   $('progressLabel').textContent = `Concluído: ${total} chave(s).`;
@@ -173,7 +212,6 @@ async function consultarLote() {
 }
 
 function classePago(r) {
-  // [texto, classe css, dica]
   if (!r.ok) return ['ERRO', 'badge-nao', r.erro || 'Erro'];
   const st = r.status;
   if (st === 'PAGA') return ['SIM — PAGA', 'badge-pago', 'Imposto pago/parcelado ou débito autuado'];
