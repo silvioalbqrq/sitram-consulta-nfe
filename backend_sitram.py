@@ -271,3 +271,11 @@ def consultar_lote(lote: LoteIn):
             "nao_encontradas": nao_encontradas, "erros": erros,
             "ceara": ceara_n,
             "resultados": todos}
+
+
+if __name__ == "__main__":
+    # Railway define PORT via env; local usa 8001 (mesmo do iniciar_sitram.bat)
+    import os
+    import uvicorn
+    porta = int(os.getenv("PORT", "8001"))
+    uvicorn.run(app, host="0.0.0.0", port=porta)

@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Consulta NFe Interestadual — SITRAM/SEFAZ-CE</title>
 <script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 <style>
   body { font-family: 'Inter', system-ui, sans-serif; background: #f8fafc; }
@@ -87,9 +88,9 @@
       <h2 class="font-bold mb-3"><i class="fa-solid fa-file-csv text-slate-900 mr-1"></i>1. Arquivo CSV / TXT</h2>
       <div id="dropzone" class="border-2 border-dashed border-slate-300 rounded-xl p-6 text-center cursor-pointer hover:border-slate-900 transition">
         <i class="fa-solid fa-cloud-arrow-up text-3xl text-slate-400"></i>
-        <p class="text-sm mt-2">Arraste o <strong>.csv ou .txt</strong> aqui ou <span class="text-slate-900 font-bold underline">clique para selecionar</span></p>
+        <p class="text-sm mt-2">Arraste <strong>.csv ou .txt</strong> (pode ser mais de um) aqui ou <span class="text-slate-900 font-bold underline">clique para selecionar</span></p>
         <p class="text-xs text-slate-400 mt-1">Ex.: “Informações Fiscais - NF-e - Emissor … .csv” ou .txt com as chaves de 44 dígitos — o site localiza as chaves sozinho</p>
-        <input id="fileInput" type="file" accept=".csv,.txt,.CSV,.TXT" class="hidden">
+        <input id="fileInput" type="file" accept=".csv,.txt,.CSV,.TXT" multiple class="hidden">
       </div>
       <div id="fileInfo" class="text-xs text-slate-500 mt-2"></div>
     </div>
@@ -140,7 +141,7 @@
     <div class="p-4 bg-slate-50 border-b flex flex-wrap items-center justify-between gap-2">
       <h2 class="font-bold"><i class="fa-solid fa-table text-slate-900 mr-1"></i>Resultado</h2>
       <div class="flex gap-2 items-center flex-wrap text-xs no-print">
-        <select id="filtro" onchange="renderTabela()" class="border border-slate-300 rounded-lg px-2 py-1">
+        <select id="filtro" onchange="PAG.page=1;renderTabela()" class="border border-slate-300 rounded-lg px-2 py-1">
           <option value="todas">Todas</option>
           <option value="pagas">Pagas</option>
           <option value="apagar">A pagar</option>
@@ -151,6 +152,7 @@
           <option value="erros">Erros</option>
         </select>
         <button onclick="exportarCSV()" class="bg-[#0f172a] hover:bg-[#1e293b] text-white font-bold px-4 py-1.5 rounded-lg"><i class="fa-solid fa-file-csv mr-1"></i>Exportar CSV</button>
+        <button onclick="exportarXLSX()" class="bg-white border border-slate-300 hover:bg-slate-50 text-slate-800 font-bold px-4 py-1.5 rounded-lg"><i class="fa-solid fa-file-excel mr-1 text-emerald-700"></i>Exportar XLSX</button>
       </div>
     </div>
     <div class="overflow-x-auto">
@@ -158,6 +160,7 @@
         <thead class="bg-slate-900 text-white uppercase text-[11px]">
           <tr>
             <th class="px-3 py-2">Chave de acesso</th>
+            <th class="px-3 py-2 text-center">cUF</th>
             <th class="px-3 py-2">NF-e</th>
             <th class="px-3 py-2">Situação NF</th>
             <th class="px-3 py-2">Situação imposto</th>
@@ -171,6 +174,21 @@
         <tbody id="tbody" class="divide-y divide-slate-200"></tbody>
       </table>
     </div>
+    <div class="px-4 py-3 bg-slate-50 border-t flex flex-wrap items-center justify-between gap-2 text-xs no-print">
+      <span id="pagInfo" class="text-slate-500"></span>
+      <div class="flex items-center gap-2">
+        <label class="text-slate-500">Por página:</label>
+        <select id="perPage" onchange="PAG.perPage=+this.value;PAG.page=1;renderTabela()" class="border border-slate-300 rounded-lg px-2 py-1">
+          <option value="50">50</option>
+          <option value="100" selected>100</option>
+          <option value="200">200</option>
+          <option value="1000000">Todas</option>
+        </select>
+        <button onclick="mudarPagina(-1)" class="bg-white border border-slate-300 hover:bg-slate-100 font-bold px-3 py-1 rounded-lg">‹ Anterior</button>
+        <span id="pagNum" class="text-slate-600 font-bold"></span>
+        <button onclick="mudarPagina(1)" class="bg-white border border-slate-300 hover:bg-slate-100 font-bold px-3 py-1 rounded-lg">Próxima ›</button>
+      </div>
+    </div>
     <p class="text-[11px] text-slate-400 px-4 py-2">Regra: <strong>PAGA</strong> = “Paga/Parcelada/Déb. autuado” ou imposto “Pago”. <strong>A PAGAR</strong> = selada com imposto pendente. <strong>SEM COBRANÇA</strong> = selada, sem imposto a recolher. <strong>NÃO SELADA</strong> = portal responde “Não foram encontradas notas fiscais” — sele a nota e consulte de novo (NF cancelada também cai aqui). <strong>CE</strong> = cUF 23, emitente do Ceará, não consultado (só interestadual).</p>
   </div>
 
@@ -183,6 +201,7 @@ let RESULTADOS = [];
 let ESTAT = { lidas: 0, duplicadas: 0, invalidas: 0, ceara: 0, fora: 0 };
 let INFO_MAP = {};
 let cancelado = false;
+let PAG = { page: 1, perPage: 100 };
 
 const $ = id => document.getElementById(id);
 const soDigitos = s => (s || '').replace(/\D/g, '');
@@ -298,8 +317,8 @@ const dz = $('dropzone'), fi = $('fileInput');
 dz.onclick = () => fi.click();
 ['dragover', 'dragenter'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.add('drop-active'); }));
 ['dragleave', 'drop'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.remove('drop-active'); }));
-dz.addEventListener('drop', e => { if (e.dataTransfer.files.length) lerArquivo(e.dataTransfer.files[0]); });
-fi.addEventListener('change', () => { if (fi.files.length) lerArquivo(fi.files[0]); });
+dz.addEventListener('drop', e => { if (e.dataTransfer.files.length) lerArquivos(e.dataTransfer.files); });
+fi.addEventListener('change', () => { if (fi.files.length) { lerArquivos(fi.files); fi.value = ''; } });
 
 function extrairChaves(texto) {
   const todas = String(texto || '').match(/\d{44}/g) || [];
@@ -329,17 +348,29 @@ function incorporarChaves(novas) {
   ESTAT.lidas += novas.length; ESTAT.duplicadas += dup;
   salvarLote(); atualizarPainelChaves();
 }
-function lerArquivo(file) {
-  const reader = new FileReader();
-  reader.onload = () => {
-    const a = analisarTexto(String(reader.result || ''), file.name);
-    incorporarChaves(a.unicas);
-    ESTAT.invalidas += a.invalidas;
-    $('fileInfo').textContent = `${file.name}: ${a.unicas.length} chave(s) (${a.todas.length - a.unicas.length} dup no arquivo, ${a.invalidas} linha(s) sem chave) · total: ${CHAVES.length}`;
-    log(`Arquivo "${file.name}": ${a.unicas.length} nova(s), ${a.invalidas} linha(s) sem chave.`);
-    atualizarPainelChaves();
-  };
-  reader.readAsText(file, 'UTF-8');
+function lerArquivo(file) { lerArquivos([file]); }
+function lerArquivos(files) {
+  const lista = [...files].filter(f => /\.(csv|txt)$/i.test(f.name) || !f.name.includes('.'));
+  if (!lista.length) { alert('Selecione arquivo(s) .csv ou .txt.'); return; }
+  let pendentes = lista.length, totNovas = 0;
+  lista.forEach(file => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const a = analisarTexto(String(reader.result || ''), file.name);
+      const antes = CHAVES.length;
+      incorporarChaves(a.unicas);
+      ESTAT.invalidas += a.invalidas;
+      totNovas += (CHAVES.length - antes);
+      if (--pendentes === 0) {
+        $('fileInfo').textContent = `${lista.length} arquivo(s): +${totNovas} chave(s) nova(s) · total: ${CHAVES.length}`;
+        log(`${lista.length} arquivo(s) lidos: +${totNovas} nova(s). Total: ${CHAVES.length}.`);
+        atualizarPainelChaves();
+      } else {
+        $('fileInfo').textContent = `Lendo arquivos… ${lista.length - pendentes}/${lista.length}`;
+      }
+    };
+    reader.readAsText(file, 'UTF-8');
+  });
 }
 function usarTextoColado() {
   const a = analisarTexto($('pasteArea').value, 'colado');
@@ -363,6 +394,7 @@ function adicionarChaveUnica() {
 function limparTudo() {
   CHAVES = []; RESULTADOS = []; INFO_MAP = {};
   ESTAT = { lidas: 0, duplicadas: 0, invalidas: 0, ceara: 0, fora: 0 };
+  PAG.page = 1;
   try { localStorage.removeItem('sitram_ultimo_lote'); } catch (e) {}
   $('pasteArea').value = ''; $('fileInfo').textContent = '';
   atualizarPainelChaves(); renderTabela(); atualizarResumo();
@@ -412,7 +444,7 @@ async function fetchComRetry(url, opts, tentativas) {
 async function consultarLote() {
   if (!CHAVES.length) return;
   if (!await pingBackend()) { alert('Backend offline. Clique em Online ou inicie o backend local.'); return; }
-  RESULTADOS = []; cancelado = false;
+  RESULTADOS = []; cancelado = false; PAG.page = 1;
   $('btnConsultar').disabled = true; $('btnCancelar').classList.remove('hidden');
   const ceKeys = CHAVES.filter(ehCeara), foraKeys = CHAVES.filter(c => !ehCeara(c));
   ceKeys.forEach(c => RESULTADOS.push(respostaCearaLocal(c)));
@@ -481,16 +513,37 @@ function fmtValor(v) {
   if (v === null || v === undefined || v === '') return '—';
   return Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
+function mudarPagina(d) {
+  const lista = RESULTADOS.filter(passaFiltro);
+  const totalPag = Math.max(1, Math.ceil(lista.length / PAG.perPage));
+  PAG.page = Math.min(totalPag, Math.max(1, PAG.page + d));
+  renderTabela();
+}
 function renderTabela() {
   const tb = $('tbody'); tb.innerHTML = '';
   const lista = RESULTADOS.filter(passaFiltro);
-  if (!lista.length) { tb.innerHTML = '<tr><td colspan="9" class="px-4 py-6 text-center text-slate-400">Nenhum resultado ainda. Carregue as chaves e clique em “Consultar lote”.</td></tr>'; return; }
-  for (const r of lista) {
+  if (!lista.length) {
+    tb.innerHTML = '<tr><td colspan="10" class="px-4 py-6 text-center text-slate-400">Nenhum resultado ainda. Carregue as chaves e clique em “Consultar lote”.</td></tr>';
+    if ($('pagInfo')) $('pagInfo').textContent = '';
+    if ($('pagNum')) $('pagNum').textContent = '';
+    return;
+  }
+  const totalPag = Math.max(1, Math.ceil(lista.length / PAG.perPage));
+  PAG.page = Math.min(totalPag, Math.max(1, PAG.page));
+  const ini = (PAG.page - 1) * PAG.perPage;
+  const fatia = lista.slice(ini, ini + PAG.perPage);
+  for (const r of fatia) {
     const [txt, cls, dica] = classePago(r);
+    const cuf = (r.chave || '').slice(0, 2) || '—';
+    const cufBadge = cuf === '23'
+      ? '<span class="px-2 py-0.5 rounded-full font-bold bg-sky-100 text-sky-800 border border-sky-200" title="Emitente do Ceará — não consultado">23 CE</span>'
+      : `<span class="font-mono">${cuf}</span>`;
     const tr = document.createElement('tr'); tr.className = 'hover:bg-slate-50';
-    tr.innerHTML = `<td class="px-3 py-2 font-mono text-[11px]">${r.chave || '—'}</td>` + `<td class="px-3 py-2">${r.numero ?? '—'}</td>` + `<td class="px-3 py-2">${r.situacao_nf || (r.encontrada === false ? '—' : (r.erro || '—'))}</td>` + `<td class="px-3 py-2">${r.situacao_imposto || '—'}</td>` + `<td class="px-3 py-2"><span title="${dica}" class="px-2 py-1 rounded-full font-bold ${cls}">${txt}</span></td>` + `<td class="px-3 py-2">${r.emitente || '—'}</td>` + `<td class="px-3 py-2">${r.destinatario || '—'}</td>` + `<td class="px-3 py-2">${r.data_fato_gerador || '—'}</td>` + `<td class="px-3 py-2 text-right">${fmtValor(r.valor_total)}</td>`;
+    tr.innerHTML = `<td class="px-3 py-2 font-mono text-[11px]">${r.chave || '—'}</td>` + `<td class="px-3 py-2 text-center">${cufBadge}</td>` + `<td class="px-3 py-2">${r.numero ?? '—'}</td>` + `<td class="px-3 py-2">${r.situacao_nf || (r.encontrada === false ? '—' : (r.erro || '—'))}</td>` + `<td class="px-3 py-2">${r.situacao_imposto || '—'}</td>` + `<td class="px-3 py-2"><span title="${dica}" class="px-2 py-1 rounded-full font-bold ${cls}">${txt}</span></td>` + `<td class="px-3 py-2">${r.emitente || '—'}</td>` + `<td class="px-3 py-2">${r.destinatario || '—'}</td>` + `<td class="px-3 py-2">${r.data_fato_gerador || '—'}</td>` + `<td class="px-3 py-2 text-right">${fmtValor(r.valor_total)}</td>`;
     tb.appendChild(tr);
   }
+  if ($('pagInfo')) $('pagInfo').textContent = `Mostrando ${ini + 1}–${Math.min(ini + PAG.perPage, lista.length)} de ${lista.length} (filtro) · ${RESULTADOS.length} no total`;
+  if ($('pagNum')) $('pagNum').textContent = `Pág. ${PAG.page}/${totalPag}`;
 }
 function atualizarResumo() {
   const box = $('resumo');
@@ -521,6 +574,20 @@ function exportarCSV() {
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob); a.download = 'sitram-consulta-nfe.csv'; a.click();
   URL.revokeObjectURL(a.href);
+}
+function linhaExport(r) {
+  const info = INFO_MAP[r.chave] || {};
+  return { chave: r.chave || '', cuf: (r.chave || '').slice(0, 2), numero: r.numero ?? '', selo: r.selo ?? '', situacao_nf: r.situacao_nf || '', situacao_imposto: r.situacao_imposto || '', status: r.status || '', paga: r.pago === true ? 'SIM' : (r.pago === false ? 'NAO' : ''), emitente: r.emitente || '', destinatario: r.destinatario || '', fato_gerador: r.data_fato_gerador || '', valor_total: r.valor_total ?? '', arquivo_origem: info.arquivo || '', linha_original: info.linha || '', erro_acao: r.erro || r.acao || '' };
+}
+function exportarXLSX() {
+  if (!RESULTADOS.length) { alert('Nada para exportar.'); return; }
+  if (typeof XLSX === 'undefined') { alert('Lib XLSX não carregou (sem internet?). Use Exportar CSV.'); return; }
+  const ws = XLSX.utils.json_to_sheet(RESULTADOS.map(linhaExport));
+  ws['!cols'] = [{ wch: 46 }, { wch: 6 }, { wch: 10 }, { wch: 12 }, { wch: 28 }, { wch: 20 }, { wch: 14 }, { wch: 8 }, { wch: 30 }, { wch: 30 }, { wch: 13 }, { wch: 14 }, { wch: 22 }, { wch: 50 }, { wch: 40 }];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'SITRAM');
+  XLSX.writeFile(wb, 'sitram-consulta-nfe.xlsx');
+  log('XLSX exportado (' + RESULTADOS.length + ' linhas).');
 }
 
 (function init() {

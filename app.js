@@ -3,6 +3,7 @@ let RESULTADOS = [];
 let ESTAT = { lidas: 0, duplicadas: 0, invalidas: 0, ceara: 0, fora: 0 };
 let INFO_MAP = {};
 let cancelado = false;
+let PAG = { page: 1, perPage: 100 };
 
 const $ = id => document.getElementById(id);
 const soDigitos = s => (s || '').replace(/\D/g, '');
@@ -118,8 +119,8 @@ const dz = $('dropzone'), fi = $('fileInput');
 dz.onclick = () => fi.click();
 ['dragover', 'dragenter'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.add('drop-active'); }));
 ['dragleave', 'drop'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.remove('drop-active'); }));
-dz.addEventListener('drop', e => { if (e.dataTransfer.files.length) lerArquivo(e.dataTransfer.files[0]); });
-fi.addEventListener('change', () => { if (fi.files.length) lerArquivo(fi.files[0]); });
+dz.addEventListener('drop', e => { if (e.dataTransfer.files.length) lerArquivos(e.dataTransfer.files); });
+fi.addEventListener('change', () => { if (fi.files.length) { lerArquivos(fi.files); fi.value = ''; } });
 
 function extrairChaves(texto) {
   const todas = String(texto || '').match(/\d{44}/g) || [];
@@ -149,17 +150,29 @@ function incorporarChaves(novas) {
   ESTAT.lidas += novas.length; ESTAT.duplicadas += dup;
   salvarLote(); atualizarPainelChaves();
 }
-function lerArquivo(file) {
-  const reader = new FileReader();
-  reader.onload = () => {
-    const a = analisarTexto(String(reader.result || ''), file.name);
-    incorporarChaves(a.unicas);
-    ESTAT.invalidas += a.invalidas;
-    $('fileInfo').textContent = `${file.name}: ${a.unicas.length} chave(s) (${a.todas.length - a.unicas.length} dup no arquivo, ${a.invalidas} linha(s) sem chave) · total: ${CHAVES.length}`;
-    log(`Arquivo "${file.name}": ${a.unicas.length} nova(s), ${a.invalidas} linha(s) sem chave.`);
-    atualizarPainelChaves();
-  };
-  reader.readAsText(file, 'UTF-8');
+function lerArquivo(file) { lerArquivos([file]); }
+function lerArquivos(files) {
+  const lista = [...files].filter(f => /\.(csv|txt)$/i.test(f.name) || !f.name.includes('.'));
+  if (!lista.length) { alert('Selecione arquivo(s) .csv ou .txt.'); return; }
+  let pendentes = lista.length, totNovas = 0;
+  lista.forEach(file => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const a = analisarTexto(String(reader.result || ''), file.name);
+      const antes = CHAVES.length;
+      incorporarChaves(a.unicas);
+      ESTAT.invalidas += a.invalidas;
+      totNovas += (CHAVES.length - antes);
+      if (--pendentes === 0) {
+        $('fileInfo').textContent = `${lista.length} arquivo(s): +${totNovas} chave(s) nova(s) · total: ${CHAVES.length}`;
+        log(`${lista.length} arquivo(s) lidos: +${totNovas} nova(s). Total: ${CHAVES.length}.`);
+        atualizarPainelChaves();
+      } else {
+        $('fileInfo').textContent = `Lendo arquivos… ${lista.length - pendentes}/${lista.length}`;
+      }
+    };
+    reader.readAsText(file, 'UTF-8');
+  });
 }
 function usarTextoColado() {
   const a = analisarTexto($('pasteArea').value, 'colado');
@@ -183,6 +196,7 @@ function adicionarChaveUnica() {
 function limparTudo() {
   CHAVES = []; RESULTADOS = []; INFO_MAP = {};
   ESTAT = { lidas: 0, duplicadas: 0, invalidas: 0, ceara: 0, fora: 0 };
+  PAG.page = 1;
   try { localStorage.removeItem('sitram_ultimo_lote'); } catch (e) {}
   $('pasteArea').value = ''; $('fileInfo').textContent = '';
   atualizarPainelChaves(); renderTabela(); atualizarResumo();
@@ -232,7 +246,7 @@ async function fetchComRetry(url, opts, tentativas) {
 async function consultarLote() {
   if (!CHAVES.length) return;
   if (!await pingBackend()) { alert('Backend offline. Clique em Online ou inicie o backend local.'); return; }
-  RESULTADOS = []; cancelado = false;
+  RESULTADOS = []; cancelado = false; PAG.page = 1;
   $('btnConsultar').disabled = true; $('btnCancelar').classList.remove('hidden');
   const ceKeys = CHAVES.filter(ehCeara), foraKeys = CHAVES.filter(c => !ehCeara(c));
   ceKeys.forEach(c => RESULTADOS.push(respostaCearaLocal(c)));
@@ -301,16 +315,37 @@ function fmtValor(v) {
   if (v === null || v === undefined || v === '') return '—';
   return Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
+function mudarPagina(d) {
+  const lista = RESULTADOS.filter(passaFiltro);
+  const totalPag = Math.max(1, Math.ceil(lista.length / PAG.perPage));
+  PAG.page = Math.min(totalPag, Math.max(1, PAG.page + d));
+  renderTabela();
+}
 function renderTabela() {
   const tb = $('tbody'); tb.innerHTML = '';
   const lista = RESULTADOS.filter(passaFiltro);
-  if (!lista.length) { tb.innerHTML = '<tr><td colspan="9" class="px-4 py-6 text-center text-slate-400">Nenhum resultado ainda. Carregue as chaves e clique em “Consultar lote”.</td></tr>'; return; }
-  for (const r of lista) {
+  if (!lista.length) {
+    tb.innerHTML = '<tr><td colspan="10" class="px-4 py-6 text-center text-slate-400">Nenhum resultado ainda. Carregue as chaves e clique em “Consultar lote”.</td></tr>';
+    if ($('pagInfo')) $('pagInfo').textContent = '';
+    if ($('pagNum')) $('pagNum').textContent = '';
+    return;
+  }
+  const totalPag = Math.max(1, Math.ceil(lista.length / PAG.perPage));
+  PAG.page = Math.min(totalPag, Math.max(1, PAG.page));
+  const ini = (PAG.page - 1) * PAG.perPage;
+  const fatia = lista.slice(ini, ini + PAG.perPage);
+  for (const r of fatia) {
     const [txt, cls, dica] = classePago(r);
+    const cuf = (r.chave || '').slice(0, 2) || '—';
+    const cufBadge = cuf === '23'
+      ? '<span class="px-2 py-0.5 rounded-full font-bold bg-sky-100 text-sky-800 border border-sky-200" title="Emitente do Ceará — não consultado">23 CE</span>'
+      : `<span class="font-mono">${cuf}</span>`;
     const tr = document.createElement('tr'); tr.className = 'hover:bg-slate-50';
-    tr.innerHTML = `<td class="px-3 py-2 font-mono text-[11px]">${r.chave || '—'}</td>` + `<td class="px-3 py-2">${r.numero ?? '—'}</td>` + `<td class="px-3 py-2">${r.situacao_nf || (r.encontrada === false ? '—' : (r.erro || '—'))}</td>` + `<td class="px-3 py-2">${r.situacao_imposto || '—'}</td>` + `<td class="px-3 py-2"><span title="${dica}" class="px-2 py-1 rounded-full font-bold ${cls}">${txt}</span></td>` + `<td class="px-3 py-2">${r.emitente || '—'}</td>` + `<td class="px-3 py-2">${r.destinatario || '—'}</td>` + `<td class="px-3 py-2">${r.data_fato_gerador || '—'}</td>` + `<td class="px-3 py-2 text-right">${fmtValor(r.valor_total)}</td>`;
+    tr.innerHTML = `<td class="px-3 py-2 font-mono text-[11px]">${r.chave || '—'}</td>` + `<td class="px-3 py-2 text-center">${cufBadge}</td>` + `<td class="px-3 py-2">${r.numero ?? '—'}</td>` + `<td class="px-3 py-2">${r.situacao_nf || (r.encontrada === false ? '—' : (r.erro || '—'))}</td>` + `<td class="px-3 py-2">${r.situacao_imposto || '—'}</td>` + `<td class="px-3 py-2"><span title="${dica}" class="px-2 py-1 rounded-full font-bold ${cls}">${txt}</span></td>` + `<td class="px-3 py-2">${r.emitente || '—'}</td>` + `<td class="px-3 py-2">${r.destinatario || '—'}</td>` + `<td class="px-3 py-2">${r.data_fato_gerador || '—'}</td>` + `<td class="px-3 py-2 text-right">${fmtValor(r.valor_total)}</td>`;
     tb.appendChild(tr);
   }
+  if ($('pagInfo')) $('pagInfo').textContent = `Mostrando ${ini + 1}–${Math.min(ini + PAG.perPage, lista.length)} de ${lista.length} (filtro) · ${RESULTADOS.length} no total`;
+  if ($('pagNum')) $('pagNum').textContent = `Pág. ${PAG.page}/${totalPag}`;
 }
 function atualizarResumo() {
   const box = $('resumo');
@@ -341,6 +376,20 @@ function exportarCSV() {
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob); a.download = 'sitram-consulta-nfe.csv'; a.click();
   URL.revokeObjectURL(a.href);
+}
+function linhaExport(r) {
+  const info = INFO_MAP[r.chave] || {};
+  return { chave: r.chave || '', cuf: (r.chave || '').slice(0, 2), numero: r.numero ?? '', selo: r.selo ?? '', situacao_nf: r.situacao_nf || '', situacao_imposto: r.situacao_imposto || '', status: r.status || '', paga: r.pago === true ? 'SIM' : (r.pago === false ? 'NAO' : ''), emitente: r.emitente || '', destinatario: r.destinatario || '', fato_gerador: r.data_fato_gerador || '', valor_total: r.valor_total ?? '', arquivo_origem: info.arquivo || '', linha_original: info.linha || '', erro_acao: r.erro || r.acao || '' };
+}
+function exportarXLSX() {
+  if (!RESULTADOS.length) { alert('Nada para exportar.'); return; }
+  if (typeof XLSX === 'undefined') { alert('Lib XLSX não carregou (sem internet?). Use Exportar CSV.'); return; }
+  const ws = XLSX.utils.json_to_sheet(RESULTADOS.map(linhaExport));
+  ws['!cols'] = [{ wch: 46 }, { wch: 6 }, { wch: 10 }, { wch: 12 }, { wch: 28 }, { wch: 20 }, { wch: 14 }, { wch: 8 }, { wch: 30 }, { wch: 30 }, { wch: 13 }, { wch: 14 }, { wch: 22 }, { wch: 50 }, { wch: 40 }];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'SITRAM');
+  XLSX.writeFile(wb, 'sitram-consulta-nfe.xlsx');
+  log('XLSX exportado (' + RESULTADOS.length + ' linhas).');
 }
 
 (function init() {
