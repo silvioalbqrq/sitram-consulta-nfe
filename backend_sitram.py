@@ -6,7 +6,7 @@
 #
 # INSTALAR: python -m pip install fastapi uvicorn
 # RODAR (na pasta deste arquivo): python -m uvicorn backend_sitram:app --port 8001
-# TESTAR: http://127.0.0.1:8001/docs  |  site: abra index.html no navegador (ou http://127.0.0.1:8001/)
+# TESTAR: http://127.0.0.1:8001/docs  |  site: abra sitram-consulta-nfe.html no navegador
 import json
 import re
 import time
@@ -22,14 +22,10 @@ from pathlib import Path
 from pydantic import BaseModel
 
 BASE_DIR = Path(__file__).resolve().parent
-HTML_FILE = BASE_DIR / "index.html"
+HTML_FILE = BASE_DIR / "sitram-consulta-nfe.html"
 
 SITRAM_API = "https://portal-sitram.sefaz.ce.gov.br/api-nota/notafiscal/por-chave-de-acesso"
 UA = {"User-Agent": "Mozilla/5.0", "Accept": "application/json"}
-
-# Regra interestadual: SITRAM-CE só para emitente de fora do CE.
-# cUF = 2 primeiros dígitos da chave. 23 = Ceará -> NÃO consultar.
-CUF_CE = "23"
 
 app = FastAPI(title="VMF Consulta SITRAM NFe")
 app.add_middleware(
@@ -51,23 +47,6 @@ def valida_chave(chave: str) -> Optional[str]:
     if chave[20:22] != "55":
         return "modelo invalido (posicoes 21-22 devem ser 55 p/ NF-e)"
     return None
-
-
-def eh_ceara(chave: str) -> bool:
-    """cUF 23 = emitente do Ceará. Não consultar no SITRAM (só interestadual)."""
-    return (chave or "")[:2] == CUF_CE
-
-
-def resposta_ceara(chave: str) -> dict:
-    return {"chave": chave, "ok": True, "encontrada": None,
-            "erro": None, "pago": None, "status": "CEARA",
-            "cuf": CUF_CE, "uf_emitente": "CE",
-            "numero": None, "selo": None,
-            "situacao_nf": "Emitente do Ceará",
-            "situacao_imposto": "—",
-            "acao": "nota de emitente do Ceará (cUF 23): não consultar no SITRAM. "
-                    "SITRAM é só para interestadual. Se a NF-e estiver Autorizada, "
-                    "verifique no emissor/SEFAZ-CE."}
 
 
 def classifica_status(situacao_nf: str, situacao_imposto: str) -> tuple:
@@ -100,8 +79,6 @@ def classifica_status(situacao_nf: str, situacao_imposto: str) -> tuple:
 
 
 def consulta_sitram(chave: str, timeout: int = 20) -> dict:
-    if eh_ceara(chave):
-        return resposta_ceara(chave)
     url = f"{SITRAM_API}/{chave}?page=0&size=25"
     req = urllib.request.Request(url, headers=UA)
     try:
@@ -163,17 +140,8 @@ def site():
     # (mesma origem = sem problema de CORS e sem configurar URL).
     if HTML_FILE.exists():
         return FileResponse(str(HTML_FILE), media_type="text/html")
-    return {"status": "backend SITRAM no ar (arquivo index.html nao encontrado ao lado do backend)",
+    return {"status": "backend SITRAM no ar (arquivo sitram-consulta-nfe.html nao encontrado ao lado do backend)",
             "docs": "/docs"}
-
-
-@app.get("/app.js", include_in_schema=False)
-def app_js():
-    # Espelho do JS inline (p/ compatibilidade se o index referenciar app.js)
-    f = BASE_DIR / "app.js"
-    if f.exists():
-        return FileResponse(str(f), media_type="application/javascript")
-    return {"erro": "app.js nao encontrado"}
 
 
 @app.get("/api/status")
@@ -183,23 +151,25 @@ def status():
 
 
 @app.get("/api/sitram/health")
-def saude_api():
-    # Sonda leve da API SITRAM: qualquer HTTP (mesmo 404) = API alcançável.
-    sonda = f"{SITRAM_API}/{'0' * 44}?page=0&size=1"
+def sitram_health(timeout: int = 12):
+    # Sonda leve na API real do SITRAM para o alerta do frontend.
+    # Usa chave sintaticamente válida; o importante é distinguir
+    # OK (API alcançável) de BLOQUEADA/INDISPONIVEL.
+    sonda = "35260361797924001984550050007807621598114292"
+    url = f"{SITRAM_API}/{sonda}?page=0&size=1"
+    req = urllib.request.Request(url, headers=UA)
     try:
-        req = urllib.request.Request(sonda, headers=UA)
-        try:
-            with urllib.request.urlopen(req, timeout=10) as r:
-                r.read(512)
-            return {"ok": True, "saude": "OK", "mensagem": "API SITRAM alcançável.", "http": 200}
-        except urllib.error.HTTPError as e:
-            if e.code in (400, 404, 422):
-                return {"ok": True, "saude": "OK", "mensagem": "API SITRAM alcançável.", "http": e.code}
-            if e.code in (401, 403):
-                return {"ok": True, "saude": "BLOQUEADA", "mensagem": "API SITRAM bloqueou o acesso.", "http": e.code}
-            return {"ok": True, "saude": "ALTERADA", "mensagem": f"API SITRAM respondeu HTTP {e.code} inesperado.", "http": e.code}
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            r.read(4096)
+            return {"ok": True, "saude": "OK", "mensagem": "API SITRAM alcançável.", "http": r.status}
+    except urllib.error.HTTPError as e:
+        if e.code in (400, 404, 422):
+            return {"ok": True, "saude": "OK", "mensagem": "API SITRAM alcançável.", "http": e.code}
+        if e.code in (401, 403):
+            return {"ok": False, "saude": "BLOQUEADA", "mensagem": "API SITRAM negou acesso.", "http": e.code}
+        return {"ok": False, "saude": "INDISPONIVEL", "mensagem": f"SITRAM respondeu HTTP {e.code}.", "http": e.code}
     except Exception as e:
-        return {"ok": False, "saude": "INDISPONIVEL", "mensagem": f"API SITRAM indisponível: {e}"[:300], "http": None}
+        return {"ok": False, "saude": "INDISPONIVEL", "mensagem": f"Falha de rede até o SITRAM: {e}"[:200], "http": None}
 
 
 @app.get("/api/sitram/consulta")
@@ -208,8 +178,6 @@ def consultar_uma(chave: str = Query(..., description="Chave de acesso com 44 di
     err = valida_chave(c)
     if err:
         return {"chave": c, "ok": False, "erro": err, "pago": None, "status": "INVALIDA"}
-    if eh_ceara(c):
-        return resposta_ceara(c)
     return consulta_sitram(c)
 
 
@@ -222,8 +190,8 @@ class LoteIn(BaseModel):
 
 @app.post("/api/sitram/lote")
 def consultar_lote(lote: LoteIn):
-    # normaliza + deduplica preservando ordem + separa CE (cUF 23)
-    vistas, fila, invalidas, ceara = set(), [], [], []
+    # normaliza + deduplica preservando ordem
+    vistas, fila, invalidas = set(), [], []
     for bruta in lote.chaves:
         c = somente_digitos(bruta)
         if not c or c in vistas:
@@ -234,8 +202,6 @@ def consultar_lote(lote: LoteIn):
             invalidas.append({"chave": c or bruta, "ok": False,
                               "erro": err, "pago": None,
                               "encontrada": None, "status": "INVALIDA"})
-        elif eh_ceara(c):
-            ceara.append(resposta_ceara(c))
         else:
             fila.append(c)
 
@@ -256,7 +222,7 @@ def consultar_lote(lote: LoteIn):
                 # map preserva a ordem da fila
                 resultados = list(ex.map(uma, fila))
 
-    todos = invalidas + ceara + resultados
+    todos = invalidas + resultados
     pagas = sum(1 for r in todos if r.get("status") == "PAGA")
     a_pagar = sum(1 for r in todos if r.get("status") == "A_PAGAR")
     sem_cobranca = sum(1 for r in todos if r.get("status") == "SEM_COBRANCA")
@@ -265,17 +231,7 @@ def consultar_lote(lote: LoteIn):
     nao_encontradas = sum(1 for r in todos
                           if r.get("ok") and r.get("encontrada") is False)
     erros = sum(1 for r in todos if not r.get("ok"))
-    ceara_n = sum(1 for r in todos if r.get("status") == "CEARA")
     return {"total": len(todos), "pagas": pagas, "a_pagar": a_pagar,
             "sem_cobranca": sem_cobranca, "nao_pagas": nao_pagas,
             "nao_encontradas": nao_encontradas, "erros": erros,
-            "ceara": ceara_n,
             "resultados": todos}
-
-
-if __name__ == "__main__":
-    # Railway define PORT via env; local usa 8001 (mesmo do iniciar_sitram.bat)
-    import os
-    import uvicorn
-    porta = int(os.getenv("PORT", "8001"))
-    uvicorn.run(app, host="0.0.0.0", port=porta)
