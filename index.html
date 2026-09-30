@@ -241,6 +241,7 @@ let PAG = { page: 1, perPage: 100 };
 const $ = id => document.getElementById(id);
 const soDigitos = s => (s || '').replace(/\D/g, '');
 const ehCeara = c => (c || '').slice(0, 2) === '23';
+const esc = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const LS_KEY = 'sitram_backend_url';
 const LS_MODE = 'sitram_backend_mode';
@@ -376,11 +377,16 @@ function extrairChaves(texto) {
   return [...new Set(todas)];
 }
 function parseCamposCSV(linha) {
-  // divide por ; ou , respeitando "aspas"
+  // divide por ; ou , respeitando "aspas" (inclui "" escapado)
   const out = [];
   let cur = '', q = false;
-  for (const ch of String(linha || '')) {
-    if (ch === '"') { q = !q; continue; }
+  const s = String(linha || '');
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if (ch === '"') {
+      if (q && s[i + 1] === '"') { cur += '"'; i++; continue; }
+      q = !q; continue;
+    }
     if (!q && (ch === ';' || ch === ',')) { out.push(cur.trim()); cur = ''; }
     else cur += ch;
   }
@@ -504,7 +510,7 @@ function atualizarPainelChaves() {
   const ce = CHAVES.filter(ehCeara);
   const canc = CHAVES.filter(c => !ehCeara(c) && INFO_MAP[c] && (INFO_MAP[c].sefaz === 'CANCELADA' || INFO_MAP[c].sefaz === 'DENEGADA'));
   const inv = CHAVES.filter(c => motivoInvalida(c));
-  const fora = CHAVES.filter(c => !ehCeara(c) && !canc.includes(c) && !inv.includes(inv));
+  const fora = CHAVES.filter(c => !ehCeara(c) && !canc.includes(c) && !inv.includes(c));
   ESTAT.ceara = ce.length; ESTAT.canc = canc.length; ESTAT.fora = fora.length;
   $('countChaves').textContent = `${CHAVES.length} (${fora.length} p/ consultar + ${ce.length} CE + ${canc.length} canc. + ${inv.length} invál.)`;
   $('btnConsultar').disabled = CHAVES.length === 0;
@@ -679,7 +685,7 @@ function renderTabela() {
       ? '<span class="px-2 py-0.5 rounded-full font-bold bg-sky-100 text-sky-800 border border-sky-200" title="Emitente do Ceará — não consultado">23 CE</span>'
       : `<span class="font-mono">${cuf}</span>`;
     const tr = document.createElement('tr'); tr.className = 'hover:bg-slate-50';
-    tr.innerHTML = `<td class="px-3 py-2 font-mono text-[11px]">${r.chave || '—'}</td>` + `<td class="px-3 py-2 text-center">${cufBadge}</td>` + `<td class="px-3 py-2">${numeroExibido(r)}</td>` + `<td class="px-3 py-2">${r.situacao_nf || (r.encontrada === false ? '—' : (r.erro || '—'))}</td>` + `<td class="px-3 py-2">${r.situacao_imposto || '—'}</td>` + `<td class="px-3 py-2"><span title="${String(dica).replace(/"/g, '')}" class="px-2 py-1 rounded-full font-bold ${cls}">${txt}</span></td>` + `<td class="px-3 py-2 col-sec">${r.emitente || '—'}</td>` + `<td class="px-3 py-2 col-sec">${r.destinatario || '—'}</td>` + `<td class="px-3 py-2 col-sec">${r.data_fato_gerador || '—'}</td>` + `<td class="px-3 py-2 text-right col-sec">${fmtValor(r.valor_total)}</td>`;
+    tr.innerHTML = `<td class="px-3 py-2 font-mono text-[11px]">${esc(r.chave) || '—'}</td>` + `<td class="px-3 py-2 text-center">${cufBadge}</td>` + `<td class="px-3 py-2">${esc(numeroExibido(r))}</td>` + `<td class="px-3 py-2">${esc(r.situacao_nf || (r.encontrada === false ? '—' : (r.erro || '—')))}</td>` + `<td class="px-3 py-2">${esc(r.situacao_imposto || '—')}</td>` + `<td class="px-3 py-2"><span title="${esc(dica)}" class="px-2 py-1 rounded-full font-bold ${cls}">${esc(txt)}</span></td>` + `<td class="px-3 py-2 col-sec">${esc(r.emitente) || '—'}</td>` + `<td class="px-3 py-2 col-sec">${esc(r.destinatario) || '—'}</td>` + `<td class="px-3 py-2 col-sec">${esc(r.data_fato_gerador) || '—'}</td>` + `<td class="px-3 py-2 text-right col-sec">${esc(fmtValor(r.valor_total))}</td>`;
     tb.appendChild(tr);
   }
   if ($('pagInfo')) $('pagInfo').textContent = window.__printingAll ? `${lista.length} linhas (impressão: todas)` : `Mostrando ${ini + 1}–${Math.min(ini + PAG.perPage, lista.length)} de ${lista.length} (filtro) · ${RESULTADOS.length} no total`;
@@ -709,6 +715,8 @@ function atualizarCabecalhoImpressao() {
 }
 function imprimirResultado() {
   if (!RESULTADOS.length) { alert('Nada para imprimir. Consulte o lote primeiro.'); return; }
+  const total = RESULTADOS.filter(passaFiltro).length;
+  if (total > 500 && !confirm(`São ${total} linhas para imprimir. Lote grande pode travar a aba/impressora. Continuar mesmo assim?`)) return;
   window.__printingAll = true;
   renderTabela();
   atualizarCabecalhoImpressao();

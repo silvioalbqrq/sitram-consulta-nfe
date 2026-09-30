@@ -15,11 +15,11 @@ import urllib.error
 from concurrent.futures import ThreadPoolExecutor
 from typing import List, Optional
 
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pathlib import Path
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 BASE_DIR = Path(__file__).resolve().parent
 HTML_FILE = BASE_DIR / "sitram-consulta-nfe.html"
@@ -27,10 +27,20 @@ HTML_FILE = BASE_DIR / "sitram-consulta-nfe.html"
 SITRAM_API = "https://portal-sitram.sefaz.ce.gov.br/api-nota/notafiscal/por-chave-de-acesso"
 UA = {"User-Agent": "Mozilla/5.0", "Accept": "application/json"}
 
+# Limite anti-DoS: o Railway gratuito + SITRAM nao aguentam lote infinito.
+MAX_LOTE = 500
+# Origens autorizadas a usar este proxy (Pages + local). Evita que
+# terceiros usem sua cota do Railway como proxy gratuito.
+ORIGENS = [
+    "https://silvioalbqrq.github.io",
+    "http://127.0.0.1:8001",
+    "http://localhost:8001",
+]
+
 app = FastAPI(title="VMF Consulta SITRAM NFe")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ORIGENS,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -40,12 +50,27 @@ def somente_digitos(s: str) -> str:
     return re.sub(r"\D", "", s or "")
 
 
+def dv_valido(chave: str) -> bool:
+    """DV modulo 11 da chave NF-e (43 primeiros digitos, pesos 2..9)."""
+    if not re.fullmatch(r"\d{44}", chave or ""):
+        return False
+    soma, peso = 0, 2
+    for i in range(42, -1, -1):
+        soma += int(chave[i]) * peso
+        peso = 2 if peso == 9 else peso + 1
+    resto = soma % 11
+    dv = 0 if resto in (0, 1) else 11 - resto
+    return dv == int(chave[43])
+
+
 def valida_chave(chave: str) -> Optional[str]:
-    """Retorna msg de erro ou None se OK. Exige 44 digitos e modelo 55."""
+    """Retorna msg de erro ou None se OK. Exige 44 digitos, modelo 55 e DV."""
     if not re.fullmatch(r"\d{44}", chave or ""):
         return "chave deve ter 44 digitos numericos"
     if chave[20:22] != "55":
         return "modelo invalido (posicoes 21-22 devem ser 55 p/ NF-e)"
+    if not dv_valido(chave):
+        return "digito verificador invalido (modulo 11)"
     return None
 
 
@@ -153,8 +178,6 @@ def status():
 @app.get("/api/sitram/health")
 def sitram_health(timeout: int = 12):
     # Sonda leve na API real do SITRAM para o alerta do frontend.
-    # Usa chave sintaticamente válida; o importante é distinguir
-    # OK (API alcançável) de BLOQUEADA/INDISPONIVEL.
     sonda = "35260361797924001984550050007807621598114292"
     url = f"{SITRAM_API}/{sonda}?page=0&size=1"
     req = urllib.request.Request(url, headers=UA)
@@ -182,7 +205,7 @@ def consultar_uma(chave: str = Query(..., description="Chave de acesso com 44 di
 
 
 class LoteIn(BaseModel):
-    chaves: List[str]
+    chaves: List[str] = Field(max_length=MAX_LOTE)
     intervalo: float = 0.3
     workers: int = 4
     timeout: int = 20
@@ -190,6 +213,8 @@ class LoteIn(BaseModel):
 
 @app.post("/api/sitram/lote")
 def consultar_lote(lote: LoteIn):
+    if len(lote.chaves) > MAX_LOTE:
+        raise HTTPException(status_code=413, detail=f"lote maximo de {MAX_LOTE} chaves por requisicao")
     # normaliza + deduplica preservando ordem
     vistas, fila, invalidas = set(), [], []
     for bruta in lote.chaves:
@@ -208,19 +233,27 @@ def consultar_lote(lote: LoteIn):
     resultados = []
 
     def uma(chave: str):
-        r = consulta_sitram(chave, timeout=lote.timeout)
-        if lote.intervalo:
-            time.sleep(lote.intervalo)
-        return r
+        return consulta_sitram(chave, timeout=lote.timeout)
 
     if fila:
         workers = max(1, min(lote.workers, 8, len(fila)))
         if workers == 1:
-            resultados = [uma(c) for c in fila]
+            for c in fila:
+                resultados.append(uma(c))
+                if lote.intervalo:
+                    time.sleep(lote.intervalo)
         else:
+            # Throttle global: espacar submissoes para taxa ~= 1/intervalo,
+            # em vez de dormir dentro de cada thread (que multiplicava a taxa).
+            pausa = (lote.intervalo or 0) / workers
             with ThreadPoolExecutor(max_workers=workers) as ex:
-                # map preserva a ordem da fila
-                resultados = list(ex.map(uma, fila))
+                futs = []
+                for c in fila:
+                    futs.append(ex.submit(uma, c))
+                    if pausa:
+                        time.sleep(pausa)
+                for f in futs:
+                    resultados.append(f.result())
 
     todos = invalidas + resultados
     pagas = sum(1 for r in todos if r.get("status") == "PAGA")
