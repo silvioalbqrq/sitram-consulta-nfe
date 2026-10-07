@@ -715,14 +715,59 @@ function atualizarCabecalhoImpressao() {
 }
 function imprimirResultado() {
   if (!RESULTADOS.length) { alert('Nada para imprimir. Consulte o lote primeiro.'); return; }
-  const total = RESULTADOS.filter(passaFiltro).length;
-  if (total > 500 && !confirm(`São ${total} linhas para imprimir. Lote grande pode travar a aba/impressora. Continuar mesmo assim?`)) return;
-  window.__printingAll = true;
-  renderTabela();
+  const lista = RESULTADOS.filter(passaFiltro);
+  if (!lista.length) { alert('Nada para imprimir neste filtro.'); return; }
+  if (lista.length > 500 && !confirm(`São ${lista.length} linhas para imprimir. Lote grande pode travar a aba/impressora. Continuar mesmo assim?`)) return;
   atualizarCabecalhoImpressao();
-  setTimeout(() => { window.print(); }, 50);
+  const cPagas = lista.filter(r => r.status === 'PAGA' || (!r.status && r.pago === true)).length;
+  const cAPagar = lista.filter(r => r.status === 'A_PAGAR').length;
+  const cSemCob = lista.filter(r => r.status === 'SEM_COBRANCA').length;
+  const cNaoEnc = lista.filter(r => r.ok && r.encontrada === false).length;
+  const cCeara = lista.filter(r => r.status === 'CEARA').length;
+  const cCanc = lista.filter(r => r.status === 'CANCELADA').length;
+  const cErros = lista.filter(r => !r.ok).length;
+  const filtroTxt = (($('filtro') && $('filtro').selectedOptions[0]) || {}).text || 'Todas';
+  const dt = new Date().toLocaleString('pt-BR');
+  const escH = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  let linhas = '';
+  for (const r of lista) {
+    const st = classePago(r)[0];
+    linhas += '<tr><td class="mono">' + escH(r.chave || '—') + '</td><td class="c">' + escH((r.chave || '').slice(0, 2) || '—') + '</td><td>' + escH(numeroExibido(r)) + '</td><td>' + escH(r.situacao_nf || (r.encontrada === false ? '—' : (r.erro || '—'))) + '</td><td>' + escH(r.situacao_imposto || '—') + '</td><td><b>' + escH(st) + '</b></td></tr>';
+  }
+  const html = '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>Relatório SITRAM/SEFAZ-CE</title><style>'
+    + 'body{font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#0f172a;margin:12px;}h1{font-size:15px;margin:0 0 2px;}p.meta{font-size:10px;color:#475569;margin:0 0 8px;}'
+    + '.res{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 8px;}.res div{border:1px solid #cbd5e1;border-radius:6px;padding:4px 8px;font-size:10px;}'
+    + 'table{width:100%;border-collapse:collapse;font-size:8.5pt;}th{background:#0f172a;color:#fff;padding:4px 5px;text-align:left;}td{border-bottom:1px solid #e2e8f0;padding:3px 5px;vertical-align:top;}tr{page-break-inside:avoid;}'
+    + '.mono{font-family:monospace;font-size:8pt;white-space:nowrap;}.c{text-align:center;}@page{size:A4;margin:8mm 6mm;}@media print{.no-p{display:none;}}'
+    + '</style></head><body>'
+    + '<h1>Relatório SITRAM/SEFAZ-CE</h1><p class="meta">Emitido em ' + escH(dt) + ' · Filtro: ' + escH(filtroTxt) + ' · Fonte: portal-sitram.sefaz.ce.gov.br via backend (proxy)</p>'
+    + '<div class="res"><div>Total: <b>' + lista.length + '</b></div><div>Pagas: <b>' + cPagas + '</b></div><div>A pagar: <b>' + cAPagar + '</b></div><div>Sem cobrança: <b>' + cSemCob + '</b></div><div>Não seladas: <b>' + cNaoEnc + '</b></div><div>CE: <b>' + cCeara + '</b></div><div>Canceladas: <b>' + cCanc + '</b></div><div>Erros: <b>' + cErros + '</b></div></div>'
+    + '<div class="no-p" style="margin-bottom:8px;"><button onclick="window.print()" style="padding:6px 14px;font-weight:bold;cursor:pointer;">Imprimir / Salvar PDF</button></div>'
+    + '<table><thead><tr><th>Chave de acesso</th><th>cUF</th><th>NF-e</th><th>Situação NF</th><th>Situação imposto</th><th>Status</th></tr></thead><tbody>' + linhas + '</tbody></table>'
+    + '<script>window.onload=function(){setTimeout(function(){window.print();},300);};<\/script></body></html>';
+  let win = null;
+  try { win = window.open('', '_blank'); } catch (e) { win = null; }
+  if (win) {
+    try {
+      win.document.open(); win.document.write(html); win.document.close(); win.focus();
+      log('Relatório aberto em nova aba (' + lista.length + ' linhas). Use Imprimir / Salvar PDF.');
+      return;
+    } catch (e) { try { win.close(); } catch (_e) {} }
+  }
+  try {
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = 'relatorio-sitram.html';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    log('Popup bloqueado — relatório baixado como relatorio-sitram.html (' + lista.length + ' linhas). Abra o arquivo e imprima.');
+  } catch (e) {
+    window.__printingAll = true;
+    renderTabela();
+    setTimeout(() => { try { window.print(); } catch (_e) { alert('Impressão bloqueada no iframe. Abra em Nova aba e imprima.'); } }, 50);
+  }
 }
-window.addEventListener('afterprint', () => { window.__printingAll = false; renderTabela(); });
+window.addEventListener('afterprint', () => { if (window.__printingAll) { window.__printingAll = false; renderTabela(); } });
 function exportarCSV() {
   if (!RESULTADOS.length) { alert('Nada para exportar.'); return; }
   const head = ['chave','cuf','numero','numero_csv','selo','situacao_nf','situacao_imposto','status','paga','indicador_sefaz','valor_csv','emitente','destinatario','fato_gerador','valor_total','consultado_em','arquivo_origem','linha_original','erro_acao'];
