@@ -7,9 +7,10 @@
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230F2A44'/%3E%3Crect x='0' y='26' width='32' height='3' fill='%23C9A227'/%3E%3Ctext x='16' y='22' font-family='Arial' font-size='13' font-weight='bold' fill='white' text-anchor='middle'%3EST%3C/text%3E%3C/svg%3E">
 <style>
-  body { font-family: 'Inter', system-ui, sans-serif; background: #f8fafc; }
-  .drop-active { border-color: #0f172a !important; background: #e2e8f0 !important; }
+  body { font-family: Georgia, 'Times New Roman', serif; background: #f4f2ec; }
+  .drop-active { border-color: #0f2a44 !important; background: #faf4e0 !important; }
   .badge-pago { background: #dcfce7; color: #166534; }
   .badge-nao { background: #fee2e2; color: #991b1b; }
   .badge-neutro { background: #f1f5f9; color: #475569; }
@@ -18,6 +19,27 @@
   #log { max-height: 140px; overflow-y: auto; }
   #printHead { display: none; }
   @page { size: A4; margin: 7mm 6mm 8mm 6mm; }
+  :root{
+  --hub-navy:#0f2a44; --hub-navy2:#1a3a5c; --hub-gold:#c9a227; --hub-gold2:#a8861b; --hub-goldbg:#faf4e0;
+}
+body{font-family:Georgia,"Times New Roman",serif !important;background:#f4f2ec !important;}
+header.hub-top{border-bottom:4px solid var(--hub-gold) !important;}
+.brand-mark{width:44px;height:44px;border-radius:10px;background:var(--hub-gold);color:var(--hub-navy);
+  display:grid;place-items:center;font-weight:800;font-size:1rem;flex:none;font-family:Georgia,serif;}
+.hero-eyebrow{color:var(--hub-gold);text-transform:uppercase;letter-spacing:.22em;font-size:.7rem;font-weight:700;margin:0 0 .35rem;}
+main h2{font-family:Georgia,"Times New Roman",serif !important;color:var(--hub-navy) !important;
+  border-left:4px solid var(--hub-gold);padding-left:10px;}
+main .bg-white.rounded-2xl{border-top:3px solid var(--hub-gold);}
+#resumo>div{border-top:3px solid var(--hub-gold);}
+thead{background:var(--hub-navy) !important;}
+thead th{background:var(--hub-navy) !important;}
+#btnConsultar{background:var(--hub-navy) !important;}
+#btnConsultar:hover{background:var(--hub-navy2) !important;}
+footer.hub-foot{background:var(--hub-navy);color:#cdd9e8;border-top:4px solid var(--hub-gold);
+  text-align:center;font-size:.76rem;padding:1.1rem;line-height:1.7;}
+footer.hub-foot a{color:#fff;}
+footer.hub-foot small{color:#9db1c7;}
+a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--hub-gold);outline-offset:2px;}
   @media print {
     .no-print { display: none !important; }
     body { background: #fff !important; padding-bottom: 0; font-size: 9px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
@@ -47,13 +69,14 @@
 </head>
 <body class="text-slate-800 pb-12">
 
-<header class="bg-[#0f172a] text-white py-10 px-4 sm:px-8 shadow">
+<header class="hub-top bg-[#0f2a44] text-white py-10 px-4 sm:px-8 shadow">
   <div class="max-w-6xl mx-auto flex flex-col md:flex-row justify-between gap-3 md:items-center">
     <div class="flex items-center gap-3">
-      <i class="fa-solid fa-file-invoice text-3xl"></i>
+      <span class="brand-mark">ST</span>
       <div>
+        <p class="hero-eyebrow">Hub Fiscal · VMF Contabilidade · Reforma Tributária EC 132/2023 · LC 214/2025</p>
         <h1 class="text-xl sm:text-2xl font-extrabold">Consulta NFe Interestadual — SITRAM/SEFAZ-CE</h1>
-        <p class="text-sm text-slate-400">Lote por chave de acesso (44 dígitos) · Situação: paga ou não · Fonte: portal-sitram.sefaz.ce.gov.br</p>
+        <p class="text-sm text-slate-400">Lote por chave de acesso (44 dígitos) · Situação: paga ou não · Fonte: portal-sitram.sefaz.ce.gov.br · <b style="color:var(--hub-gold)">por VMF Contabilidade</b> · <a href="https://silvioalbqrq.github.io/portal-fiscal/" style="color:var(--hub-gold);text-decoration:none">Hub Fiscal</a></p>
       </div>
     </div>
     <div class="flex items-center gap-2 text-xs no-print flex-wrap">
@@ -146,14 +169,14 @@
         <button onclick="imprimirResultado()" class="bg-white border border-slate-300 hover:bg-slate-50 text-slate-800 text-xs font-bold px-4 py-2 rounded-lg"><i class="fa-solid fa-print mr-1"></i>Imprimir Resultado</button>
         <button id="btnCancelar" onclick="cancelarConsulta()" class="bg-rose-100 hover:bg-rose-200 text-rose-700 text-xs font-bold px-4 py-2 rounded-lg hidden"><i class="fa-solid fa-stop mr-1"></i>Cancelar</button>
         <button id="btnPendentes" onclick="reconsultarPendentes()" class="bg-amber-100 hover:bg-amber-200 text-amber-800 text-xs font-bold px-4 py-2 rounded-lg" title="Consulta só NÃO SELADA + ERROS"><i class="fa-solid fa-rotate-right mr-1"></i>Reconsultar pendentes</button>
-        <button id="btnConsultar" onclick="consultarLote()" class="bg-[#0f172a] hover:bg-[#1e293b] text-white text-sm font-bold px-6 py-2 rounded-lg disabled:opacity-50" disabled><i class="fa-solid fa-magnifying-glass mr-1"></i>Consultar lote no SITRAM</button>
+        <button id="btnConsultar" onclick="consultarLote()" class="bg-[#0f2a44] hover:bg-[#1a3a5c] text-white text-sm font-bold px-6 py-2 rounded-lg disabled:opacity-50" disabled><i class="fa-solid fa-magnifying-glass mr-1"></i>Consultar lote no SITRAM</button>
       </div>
     </div>
     <div id="statsLote" class="mt-3 flex flex-wrap gap-2 text-[11px] no-print"></div>
     <div id="chavesPreview" class="mt-3 text-xs font-mono text-slate-500 max-h-24 overflow-y-auto no-print"></div>
     <div class="mt-3 no-print">
       <div class="flex justify-between text-xs text-slate-500 mb-1"><span id="progressLabel">Aguardando consulta…</span><span id="progressPct"></span></div>
-      <div class="h-2 bg-slate-200 rounded-full overflow-hidden"><div id="progressBar" class="h-2 bg-[#0f172a] rounded-full transition-all" style="width:0%"></div></div>
+      <div class="h-2 bg-slate-200 rounded-full overflow-hidden"><div id="progressBar" class="h-2 bg-[#0f2a44] rounded-full transition-all" style="width:0%"></div></div>
     </div>
     <div id="log" class="mt-2 text-xs text-slate-500 no-print"></div>
   </div>
@@ -186,13 +209,13 @@
           <option value="canc">Canceladas</option>
           <option value="erros">Erros / inválidas</option>
         </select>
-        <button onclick="exportarCSV()" class="bg-[#0f172a] hover:bg-[#1e293b] text-white font-bold px-4 py-1.5 rounded-lg"><i class="fa-solid fa-file-csv mr-1"></i>Exportar CSV</button>
+        <button onclick="exportarCSV()" class="bg-[#0f2a44] hover:bg-[#1a3a5c] text-white font-bold px-4 py-1.5 rounded-lg"><i class="fa-solid fa-file-csv mr-1"></i>Exportar CSV</button>
         <button onclick="exportarXLSX()" class="bg-white border border-slate-300 hover:bg-slate-50 text-slate-800 font-bold px-4 py-1.5 rounded-lg"><i class="fa-solid fa-file-excel mr-1 text-emerald-700"></i>Exportar XLSX</button>
       </div>
     </div>
     <div class="overflow-x-auto">
       <table class="w-full text-xs text-left">
-        <thead class="bg-slate-900 text-white uppercase text-[11px]">
+        <thead class="bg-[#0f2a44] text-white uppercase text-[11px]">
           <tr>
             <th class="px-3 py-2">Chave de acesso</th>
             <th class="px-3 py-2 text-center">cUF</th>
@@ -227,7 +250,7 @@
     <p class="text-[11px] text-slate-400 px-4 py-2 nota-rodape">Regra: <strong>PAGA</strong> = “Paga/Parcelada/Déb. autuado” ou imposto “Pago”. <strong>A PAGAR</strong> = selada com imposto pendente. <strong>SEM COBRANÇA</strong> = selada, sem imposto a recolher. <strong>NÃO SELADA</strong> = portal responde “Não foram encontradas notas fiscais” — sele a nota e consulte de novo. <strong>CANCELADA</strong> = indicada no CSV como cancelada/denegada (não consultada no SITRAM). <strong>CE</strong> = cUF 23, emitente do Ceará, não consultado (só interestadual). Impressão compacta: colunas emitente/destinatário/fato/valor ocultas para caber 20+ linhas por página.</p>
   </div>
 
-  <footer class="text-center text-xs text-slate-400 no-print">Fonte dos dados: SITRAM/SEFAZ-CE · Uso via backend (proxy) para respeitar CORS · Confira valores críticos no portal oficial.</footer>
+  <footer class="hub-foot no-print"><strong style="color:#fff">Hub Fiscal · VMF Contabilidade</strong> · <a href="https://silvioalbqrq.github.io/portal-fiscal/">Voltar ao Hub</a><br>Fonte dos dados: SITRAM/SEFAZ-CE · Uso via backend (proxy) para respeitar CORS · Confira valores críticos no portal oficial.<br><small>Portal educacional e informativo. Não substitui parecer técnico ou assessoria contábil/jurídica.</small></footer>
 </main>
 
 <script>
