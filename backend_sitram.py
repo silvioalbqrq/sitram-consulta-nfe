@@ -27,10 +27,10 @@ HTML_FILE = BASE_DIR / "sitram-consulta-nfe.html"
 SITRAM_API = "https://portal-sitram.sefaz.ce.gov.br/api-nota/notafiscal/por-chave-de-acesso"
 UA = {"User-Agent": "Mozilla/5.0", "Accept": "application/json"}
 
-# Limite anti-DoS: o Railway gratuito + SITRAM nao aguentam lote infinito.
+# Limite anti-DoS: o Render gratuito + SITRAM nao aguentam lote infinito.
 MAX_LOTE = 500
 # Origens autorizadas a usar este proxy (Pages + local). Evita que
-# terceiros usem sua cota do Railway como proxy gratuito.
+# terceiros usem sua cota do Render como proxy gratuito.
 ORIGENS = [
     "https://silvioalbqrq.github.io",
     "http://127.0.0.1:8001",

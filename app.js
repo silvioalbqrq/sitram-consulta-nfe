@@ -11,20 +11,20 @@ const ehCeara = c => (c || '').slice(0, 2) === '23';
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const LS_KEY = 'sitram_backend_url';
 const LS_MODE = 'sitram_backend_mode';
-const URL_ONLINE = 'https://sitram-consulta-nfe-production.up.railway.app';
+const URL_ONLINE = 'https://sitram-consulta-nfe.onrender.com';
 const URL_LOCAL = 'http://127.0.0.1:8001';
 
 function mesmaOrigemBackend() {
   const o = window.location.origin || '';
   if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(o)) return o;
-  if (/railway\.app$/i.test(window.location.hostname || '')) return o;
+  if (/railway\.app$|onrender\.com$/i.test(window.location.hostname || '')) return o;
   return null;
 }
 function detectarModoInicial() {
   const salvo = localStorage.getItem(LS_MODE);
   if (salvo === 'online' || salvo === 'local' || salvo === 'custom') return salvo;
   const host = (window.location.hostname || '').toLowerCase();
-  if (host.includes('github.io') || host.includes('railway.app')) return 'online';
+  if (host.includes('github.io') || host.includes('railway.app') || host.includes('onrender.com')) return 'online';
   if (host === 'localhost' || host === '127.0.0.1') return 'local';
   return 'online';
 }
@@ -54,7 +54,7 @@ function log(msg) {
 }
 function salvarBackendUrl() {
   const v = ($('backendUrl').value || '').trim().replace(/\/$/, '');
-  if (!v) { alert('Informe a URL do backend (Railway ou local).'); return; }
+  if (!v) { alert('Informe a URL do backend (Render ou local).'); return; }
   localStorage.setItem(LS_KEY, v);
   if (v === URL_ONLINE) localStorage.setItem(LS_MODE, 'online');
   else if (v.includes('127.0.0.1') || v.includes('localhost')) localStorage.setItem(LS_MODE, 'local');
@@ -79,7 +79,7 @@ async function pingBackend() {
     } catch (e) {}
   }
   const isLocal = /127\.0\.0\.1|localhost/i.test(base);
-  $('backendStatus').textContent = isLocal ? 'offline — inicie o backend local' : 'offline — confira a URL do Railway';
+  $('backendStatus').textContent = isLocal ? 'offline — inicie o backend local' : 'offline — confira a URL do Render';
   $('backendStatus').className = 'px-2 py-1 rounded-full bg-rose-600 text-white';
   return false;
 }
@@ -92,7 +92,7 @@ async function verificarSaudeApiSitram() {
     if (!r.ok) {
       box.className = 'no-print rounded-2xl border p-4 text-sm border-rose-300 bg-rose-50 text-rose-900';
       tit.textContent = 'Não foi possível verificar a API SITRAM';
-      msg.textContent = 'O backend respondeu HTTP ' + r.status + '. Confira se o Railway/local está no ar.';
+      msg.textContent = 'O backend respondeu HTTP ' + r.status + '. Confira se o Render/local está no ar.';
       box.classList.remove('hidden'); return;
     }
     const h = await r.json();

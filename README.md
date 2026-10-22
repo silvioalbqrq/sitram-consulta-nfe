@@ -13,34 +13,34 @@ Classifica automaticamente se a nota está **PAGA**, **A PAGAR**, **SEM COBRANÇ
 | Parte | Onde | Arquivo |
 |-------|------|---------|
 | Frontend (interface) | **GitHub Pages** | `index.html` |
-| Backend (API proxy) | **Railway** | `backend_sitram.py` |
+| Backend (API proxy) | **Render** | `backend_sitram.py` |
 
 O frontend chama o backend. O backend consulta a API pública do portal SITRAM e devolve o status normalizado.
 
-Também funciona **100% local** (sem Railway), com o arquivo `iniciar_sitram.bat`.
+Também funciona **100% local** (sem Render), com o arquivo `iniciar_sitram.bat`.
 
 ---
 
-## 1. Deploy do backend no Railway
+## 1. Deploy do backend no Render
 
-1. Crie uma conta em [railway.app](https://railway.app)
-2. **New Project** → **Deploy from GitHub repo** (este repositório)
-3. Se pedir, defina o **Start Command**:
-   ```bash
-   uvicorn backend_sitram:app --host 0.0.0.0 --port $PORT
-   ```
-4. O `Procfile` e o `requirements.txt` já estão prontos
+1. Crie uma conta em [render.com](https://render.com) (login com GitHub, sem cartão)
+2. **New** → **Blueprint** → conecte este repositório
+3. O `render.yaml` é detectado automaticamente (build, start e healthcheck já configurados)
+4. Clique em **Apply** e aguarde o primeiro build (~2–5 min)
 5. Após o deploy, copie a URL pública, exemplo:
    ```
-   https://sitram-consulta-nfe-production.up.railway.app
+   https://sitram-consulta-nfe.onrender.com
    ```
+
+> Free tier: o serviço **dorme após 15 min sem uso** e leva ~1 min para acordar
+> na primeira consulta/requisição — o restante responde normal.
 
 ### Teste rápido do backend
 
 Abra no navegador:
 
 ```
-https://SUA-URL.up.railway.app/api/status
+https://SUA-URL.onrender.com/api/status
 ```
 
 Deve retornar algo como:
@@ -49,7 +49,7 @@ Deve retornar algo como:
 {"status": "backend SITRAM no ar", "docs": "/docs", "site": "..."}
 ```
 
-Documentação interativa: `https://SUA-URL.up.railway.app/docs`
+Documentação interativa: `https://SUA-URL.onrender.com/docs`
 
 ---
 
@@ -67,14 +67,14 @@ Documentação interativa: `https://SUA-URL.up.railway.app/docs`
 ### Configurar a URL do backend
 
 1. Abra o site no GitHub Pages
-2. No canto superior direito, no campo **Backend**, cole a URL do Railway
+2. No canto superior direito, no campo **Backend**, cole a URL do Render
 3. Clique em **Salvar** (fica gravado no navegador via `localStorage`)
 
 Pronto. As consultas passam a usar o backend online.
 
 ---
 
-## 3. Uso local (sem Railway)
+## 3. Uso local (sem Render)
 
 No Windows, na pasta do projeto:
 
@@ -95,7 +95,7 @@ Abra: [http://127.0.0.1:8001/](http://127.0.0.1:8001/)
 
 ## Como usar a ferramenta
 
-1. Informe a URL do backend (Railway ou local) e salve
+1. Informe a URL do backend (Render ou local) e salve
 2. Arraste um `.csv` / `.txt` ou cole as chaves de 44 dígitos
 3. Clique em **Consultar lote**
 4. Veja o resumo (Pagas, A pagar, Sem cobrança, Não seladas, Erros)
@@ -138,9 +138,10 @@ Exemplo de lote:
 
 ```
 ├── index.html           # Frontend (GitHub Pages)
-├── backend_sitram.py    # Backend FastAPI (Railway)
+├── backend_sitram.py    # Backend FastAPI (Render)
 ├── requirements.txt     # fastapi + uvicorn
-├── Procfile             # Comando de start do Railway
+├── render.yaml          # Blueprint de deploy no Render
+├── Procfile             # Comando de start (Render / local)
 ├── iniciar_sitram.bat   # Atalho Windows (uso local)
 ├── README.md
 └── .gitignore
