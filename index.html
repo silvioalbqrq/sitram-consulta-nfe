@@ -74,9 +74,9 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
     <div class="flex items-center gap-3">
       <span class="brand-mark">ST</span>
       <div>
-        <p class="hero-eyebrow">Hub Fiscal · VMF Contabilidade · Reforma Tributária EC 132/2023 · LC 214/2025</p>
+        <p class="hero-eyebrow">Hub Fiscal · Reforma Tributária EC 132/2023 · LC 214/2025</p>
         <h1 class="text-xl sm:text-2xl font-extrabold">Consulta NFe Interestadual — SITRAM/SEFAZ-CE</h1>
-        <p class="text-sm text-slate-400">Lote por chave de acesso (44 dígitos) · Situação: paga ou não · Fonte: portal-sitram.sefaz.ce.gov.br · <b style="color:var(--hub-gold)">por VMF Contabilidade</b> · <a href="https://silvioalbqrq.github.io/portal-fiscal/" style="color:var(--hub-gold);text-decoration:none">Hub Fiscal</a></p>
+        <p class="text-sm text-slate-400">Lote por chave de acesso (44 dígitos) · Situação: paga ou não · Fonte: portal-sitram.sefaz.ce.gov.br · <a href="https://silvioalbqrq.github.io/portal-fiscal/" style="color:var(--hub-gold);text-decoration:none">Hub Fiscal</a></p>
       </div>
     </div>
     <div class="flex items-center gap-2 text-xs no-print flex-wrap">
@@ -86,6 +86,7 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
       <input id="backendUrl" placeholder="URL do backend" class="text-slate-800 px-2 py-1 rounded-lg w-56 text-xs" title="URL do backend">
       <button type="button" id="btnSalvarBackend" class="px-2 py-1 rounded-lg bg-slate-600 hover:bg-slate-500 text-white text-xs" title="Salvar URL">Salvar</button>
       <span id="backendStatus" class="px-2 py-1 rounded-full bg-slate-700 text-slate-200">não testado</span>
+      <span class="text-slate-500 hidden lg:inline" title="No modo Online (Render free tier), a 1ª requisição após ~15 min de inatividade demora até ~1 min para o backend acordar.">⏱ 1º acesso pode levar ~1 min</span>
     </div>
   </div>
 </header>
@@ -110,6 +111,7 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
       <li>Envie o <strong>.csv ou .txt</strong> (o site localiza as chaves de 44 dígitos sozinho, mesmo com CNPJ e valores na linha) ou cole as chaves.</li>
       <li>Clique em <strong>Consultar lote</strong>. Para impressão compacta (20+ linhas/página), use <strong>Imprimir Resultado</strong>.</li>
       <li>Exporte o resultado em CSV ou XLSX.</li>
+      <li>No modo <strong>Online</strong> (Render free tier), se ninguém usar por ~15 min, a <strong>1ª requisição do dia pode demorar até 1 min</strong> para o backend acordar — depois volta normal.</li>
     </ol>
     <div class="mt-3 bg-slate-900 text-slate-200 p-3 rounded-xl text-xs">
       <strong>Regra interestadual:</strong> este painel consulta <strong>somente emitente de fora do Ceará</strong>.
@@ -250,7 +252,17 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
     <p class="text-[11px] text-slate-400 px-4 py-2 nota-rodape">Regra: <strong>PAGA</strong> = “Paga/Parcelada/Déb. autuado” ou imposto “Pago”. <strong>A PAGAR</strong> = selada com imposto pendente. <strong>SEM COBRANÇA</strong> = selada, sem imposto a recolher. <strong>NÃO SELADA</strong> = portal responde “Não foram encontradas notas fiscais” — sele a nota e consulte de novo. <strong>CANCELADA</strong> = indicada no CSV como cancelada/denegada (não consultada no SITRAM). <strong>CE</strong> = cUF 23, emitente do Ceará, não consultado (só interestadual). Impressão compacta: colunas emitente/destinatário/fato/valor ocultas para caber 20+ linhas por página.</p>
   </div>
 
-  <footer class="hub-foot no-print"><strong style="color:#fff">Hub Fiscal · VMF Contabilidade</strong> · <a href="https://silvioalbqrq.github.io/portal-fiscal/">Voltar ao Hub</a><br>Fonte dos dados: SITRAM/SEFAZ-CE · Uso via backend (proxy) para respeitar CORS · Confira valores críticos no portal oficial.<br><small>Portal educacional e informativo. Não substitui parecer técnico ou assessoria contábil/jurídica.</small></footer>
+  <div class="grid md:grid-cols-2 gap-4 no-print">
+    <div class="bg-white rounded-2xl border border-slate-200 p-5 text-sm">
+      <h2 class="font-bold mb-3"><i class="fa-solid fa-comments text-slate-900 mr-1"></i>Contato</h2>
+      <div class="flex gap-3">
+        <a href="https://github.com/silvioalbqrq" target="_blank" rel="noopener" title="GitHub" class="w-10 h-10 rounded-xl border border-slate-300 flex items-center justify-center hover:bg-slate-50"><i class="fa-brands fa-github text-lg"></i></a>
+      </div>
+      <p class="text-xs text-slate-400 mt-2">Dúvidas, sugestões ou problemas com a consulta.</p>
+    </div>
+  </div>
+
+  <footer class="hub-foot no-print"><strong style="color:#fff">Hub Fiscal</strong> · <a href="https://silvioalbqrq.github.io/portal-fiscal/">Voltar ao Hub</a><br>Fonte dos dados: SITRAM/SEFAZ-CE · Uso via backend (proxy) para respeitar CORS · Confira valores críticos no portal oficial.<br><small>Portal educacional e informativo. Não substitui parecer técnico ou assessoria contábil/jurídica.</small></footer>
 </main>
 
 <script>
