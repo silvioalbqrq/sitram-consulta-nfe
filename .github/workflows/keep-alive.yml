@@ -1,0 +1,35 @@
+# Keep-alive: mantém o backend do Render acordado.
+# O free tier do Render dorme após ~15 min sem trafego e leva ~1 min para acordar.
+# Este workflow pinga /api/status a cada 10 minutos (servico 24/7 cabe nas
+# 750 h/mes gratuitas do Render; GitHub Actions e gratuito em repos publicos).
+name: keep-alive
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch: {}
+  push:
+    paths:
+      - .github/workflows/keep-alive.yml
+
+permissions:
+  contents: read
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Ping /api/status
+        run: |
+          set -e
+          url="https://sitram-consulta-nfe.onrender.com/api/status"
+          for i in 1 2 3; do
+            if curl -fsS --max-time 25 "$url"; then
+              echo "OK"
+              exit 0
+            fi
+            echo "Falha $i/3; aguardando e tentando de novo (cold start pode demorar)..."
+            sleep 20
+          done
+          echo "::warning::Backend não respondeu; proximo ping em 10 minutos."

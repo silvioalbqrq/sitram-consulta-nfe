@@ -22,7 +22,7 @@ from pathlib import Path
 from pydantic import BaseModel, Field
 
 BASE_DIR = Path(__file__).resolve().parent
-HTML_FILE = BASE_DIR / "sitram-consulta-nfe.html"
+HTML_FILE = BASE_DIR / "index.html"
 
 SITRAM_API = "https://portal-sitram.sefaz.ce.gov.br/api-nota/notafiscal/por-chave-de-acesso"
 UA = {"User-Agent": "Mozilla/5.0", "Accept": "application/json"}

@@ -143,6 +143,7 @@ Exemplo de lote:
 ├── render.yaml          # Blueprint de deploy no Render
 ├── Procfile             # Comando de start (Render / local)
 ├── iniciar_sitram.bat   # Atalho Windows (uso local)
+├── .github/workflows/keep-alive.yml  # Ping 10min p/ o Render nao dormir
 ├── README.md
 └── .gitignore
 ```
