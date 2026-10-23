@@ -99,7 +99,6 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
       <input id="backendUrl" placeholder="URL do backend" class="text-slate-800 px-2 py-1 rounded-lg w-56 text-xs" title="URL do backend">
       <button type="button" id="btnSalvarBackend" class="px-2 py-1 rounded-lg bg-slate-600 hover:bg-slate-500 text-white text-xs" title="Salvar URL">Salvar</button>
       <span id="backendStatus" class="px-2 py-1 rounded-full bg-slate-700 text-slate-200">não testado</span>
-      <span class="text-slate-500 hidden lg:inline" title="No modo Online (Render free tier), a 1ª requisição após ~15 min de inatividade demora até ~1 min para o backend acordar.">⏱ 1º acesso pode levar ~1 min</span>
     </div>
   </div>
 </header>
@@ -124,7 +123,7 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
       <li>Envie o <strong>.csv ou .txt</strong> (o site localiza as chaves de 44 dígitos sozinho, mesmo com CNPJ e valores na linha) ou cole as chaves.</li>
       <li>Clique em <strong>Consultar lote</strong>. Para impressão compacta (20+ linhas/página), use <strong>Imprimir Resultado</strong>.</li>
       <li>Exporte o resultado em CSV ou XLSX.</li>
-      <li>No modo <strong>Online</strong> (Render free tier), se ninguém usar por ~15 min, a <strong>1ª requisição do dia pode demorar até 1 min</strong> para o backend acordar — depois volta normal.</li>
+      <li><strong>Online:</strong> backend monitorado 24/7 (UptimeRobot). Se uma consulta inicial demorar, o backend estava acordando de um repouso — tente de novo em ~1 min.</li>
     </ol>
     <div class="mt-3 bg-slate-900 text-slate-200 p-3 rounded-xl text-xs">
       <strong>Regra interestadual:</strong> este painel consulta <strong>somente emitente de fora do Ceará</strong>.
