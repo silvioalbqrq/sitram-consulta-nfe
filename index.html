@@ -18,7 +18,13 @@
   .badge-canc { background: #e5e7eb; color: #374151; }
   #log { max-height: 140px; overflow-y: auto; }
   #printHead { display: none; }
-  .clamp2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  @media screen {
+    #blocoResultado table { font-size: 11px; }
+    #blocoResultado th, #blocoResultado td { white-space: nowrap; }
+  }
+  @media screen and (min-width: 1024px) {
+    #blocoResultado { width: calc(100vw - 48px); max-width: 1900px; margin-left: calc(50% - 50vw + 24px); }
+  }
   @page { size: A4; margin: 7mm 6mm 8mm 6mm; }
   :root{
   --hub-navy:#0f2a44; --hub-navy2:#1a3a5c; --hub-gold:#c9a227; --hub-gold2:#a8861b; --hub-goldbg:#faf4e0;
@@ -761,7 +767,7 @@ function renderTabela() {
       ? '<span class="px-2 py-0.5 rounded-full font-bold bg-sky-100 text-sky-800 border border-sky-200 whitespace-nowrap" title="Emitente do Ceará — não consultado">23 CE</span>'
       : `<span class="font-mono">${cuf}</span>`;
     const tr = document.createElement('tr'); tr.className = 'hover:bg-slate-50';
-    tr.innerHTML = `<td class="px-2 py-2 font-mono text-[10px] whitespace-nowrap">${esc(r.chave) || '—'}</td>` + `<td class="px-2 py-2 text-center whitespace-nowrap">${cufBadge}</td>` + `<td class="px-2 py-2 whitespace-nowrap">${esc(numeroExibido(r))}</td>` + `<td class="px-2 py-2">${esc(r.situacao_nf || (r.encontrada === false ? '—' : (r.erro || '—')))}</td>` + `<td class="px-2 py-2">${esc(r.situacao_imposto || '—')}</td>` + `<td class="px-2 py-2"><span title="${esc(dica)}" class="px-2 py-1 rounded-full font-bold ${cls}">${esc(txt)}</span></td>` + `<td class="px-2 py-2 col-sec"><div class="clamp2" title="${esc(emitente)}">${esc(emitente) || '—'}</div></td>` + `<td class="px-2 py-2 col-sec"><div class="clamp2" title="${esc(r.destinatario)}">${esc(r.destinatario) || '—'}</div></td>` + `<td class="px-2 py-2 col-sec whitespace-nowrap">${esc(fmtData(r.data_fato_gerador))}</td>` + `<td class="px-2 py-2 text-right col-sec whitespace-nowrap">${esc(fmtValor(r.valor_total))}</td>`;
+    tr.innerHTML = `<td class="px-2 py-2 font-mono text-[10px] whitespace-nowrap">${esc(r.chave) || '—'}</td>` + `<td class="px-2 py-2 text-center whitespace-nowrap">${cufBadge}</td>` + `<td class="px-2 py-2 whitespace-nowrap">${esc(numeroExibido(r))}</td>` + `<td class="px-2 py-2">${esc(r.situacao_nf || (r.encontrada === false ? '—' : (r.erro || '—')))}</td>` + `<td class="px-2 py-2">${esc(r.situacao_imposto || '—')}</td>` + `<td class="px-2 py-2"><span title="${esc(dica)}" class="px-2 py-1 rounded-full font-bold ${cls}">${esc(txt)}</span></td>` + `<td class="px-2 py-2 col-sec">${esc(emitente) || '—'}</td>` + `<td class="px-2 py-2 col-sec">${esc(r.destinatario) || '—'}</td>` + `<td class="px-2 py-2 col-sec whitespace-nowrap">${esc(fmtData(r.data_fato_gerador))}</td>` + `<td class="px-2 py-2 text-right col-sec whitespace-nowrap">${esc(fmtValor(r.valor_total))}</td>`;
     tb.appendChild(tr);
   }
   if ($('pagInfo')) $('pagInfo').textContent = window.__printingAll ? `${lista.length} linhas (impressão: todas)` : `Mostrando ${ini + 1}–${Math.min(ini + PAG.perPage, lista.length)} de ${lista.length} (filtro) · ${RESULTADOS.length} no total`;
