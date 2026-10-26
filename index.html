@@ -732,6 +732,14 @@ function numeroExibido(r) {
   const info = INFO_MAP[r.chave] || {};
   return info.numero_csv || '—';
 }
+// No CE o SITRAM não devolve o emitente: usa a razão social do CSV (inclusive lotes antigos salvos no navegador).
+function emitenteDaNota(r) {
+  const info = INFO_MAP[r.chave] || {};
+  if (r.emitente) return r.emitente;
+  if (info.emitente_csv) return info.emitente_csv;
+  const cols = parseCamposCSV(info.linha || '');
+  return cols.some(x => x.includes(r.chave)) ? (cols[1] || '') : '';
+}
 function renderTabela() {
   const tb = $('tbody'); tb.innerHTML = '';
   const lista = RESULTADOS.filter(passaFiltro);
@@ -747,12 +755,13 @@ function renderTabela() {
   const fatia = window.__printingAll ? lista : lista.slice(ini, ini + PAG.perPage);
   for (const r of fatia) {
     const [txt, cls, dica] = classePago(r);
+    const emitente = emitenteDaNota(r);
     const cuf = (r.chave || '').slice(0, 2) || '—';
     const cufBadge = cuf === '23'
       ? '<span class="px-2 py-0.5 rounded-full font-bold bg-sky-100 text-sky-800 border border-sky-200 whitespace-nowrap" title="Emitente do Ceará — não consultado">23 CE</span>'
       : `<span class="font-mono">${cuf}</span>`;
     const tr = document.createElement('tr'); tr.className = 'hover:bg-slate-50';
-    tr.innerHTML = `<td class="px-2 py-2 font-mono text-[10px] whitespace-nowrap">${esc(r.chave) || '—'}</td>` + `<td class="px-2 py-2 text-center whitespace-nowrap">${cufBadge}</td>` + `<td class="px-2 py-2 whitespace-nowrap">${esc(numeroExibido(r))}</td>` + `<td class="px-2 py-2">${esc(r.situacao_nf || (r.encontrada === false ? '—' : (r.erro || '—')))}</td>` + `<td class="px-2 py-2">${esc(r.situacao_imposto || '—')}</td>` + `<td class="px-2 py-2"><span title="${esc(dica)}" class="px-2 py-1 rounded-full font-bold ${cls}">${esc(txt)}</span></td>` + `<td class="px-2 py-2 col-sec"><div class="clamp2" title="${esc(r.emitente)}">${esc(r.emitente) || '—'}</div></td>` + `<td class="px-2 py-2 col-sec"><div class="clamp2" title="${esc(r.destinatario)}">${esc(r.destinatario) || '—'}</div></td>` + `<td class="px-2 py-2 col-sec whitespace-nowrap">${esc(fmtData(r.data_fato_gerador))}</td>` + `<td class="px-2 py-2 text-right col-sec whitespace-nowrap">${esc(fmtValor(r.valor_total))}</td>`;
+    tr.innerHTML = `<td class="px-2 py-2 font-mono text-[10px] whitespace-nowrap">${esc(r.chave) || '—'}</td>` + `<td class="px-2 py-2 text-center whitespace-nowrap">${cufBadge}</td>` + `<td class="px-2 py-2 whitespace-nowrap">${esc(numeroExibido(r))}</td>` + `<td class="px-2 py-2">${esc(r.situacao_nf || (r.encontrada === false ? '—' : (r.erro || '—')))}</td>` + `<td class="px-2 py-2">${esc(r.situacao_imposto || '—')}</td>` + `<td class="px-2 py-2"><span title="${esc(dica)}" class="px-2 py-1 rounded-full font-bold ${cls}">${esc(txt)}</span></td>` + `<td class="px-2 py-2 col-sec"><div class="clamp2" title="${esc(emitente)}">${esc(emitente) || '—'}</div></td>` + `<td class="px-2 py-2 col-sec"><div class="clamp2" title="${esc(r.destinatario)}">${esc(r.destinatario) || '—'}</div></td>` + `<td class="px-2 py-2 col-sec whitespace-nowrap">${esc(fmtData(r.data_fato_gerador))}</td>` + `<td class="px-2 py-2 text-right col-sec whitespace-nowrap">${esc(fmtValor(r.valor_total))}</td>`;
     tb.appendChild(tr);
   }
   if ($('pagInfo')) $('pagInfo').textContent = window.__printingAll ? `${lista.length} linhas (impressão: todas)` : `Mostrando ${ini + 1}–${Math.min(ini + PAG.perPage, lista.length)} de ${lista.length} (filtro) · ${RESULTADOS.length} no total`;
@@ -801,7 +810,7 @@ function imprimirResultado() {
     const st = classePago(r)[0];
     const info = INFO_MAP[r.chave] || {};
     const emissao = info.data_csv ? fmtData(info.data_csv) : '';
-    const sub = [r.emitente || info.emitente_csv || '', emissao ? 'Emissão ' + emissao : ''].filter(Boolean).join(' · ');
+    const sub = [emitenteDaNota(r), emissao ? 'Emissão ' + emissao : ''].filter(Boolean).join(' · ');
     linhas += '<tr><td class="mono">' + escH(r.chave || '—') + (sub ? '<span class="sub">' + escH(sub) + '</span>' : '') + '</td><td class="c">' + escH((r.chave || '').slice(0, 2) || '—') + '</td><td>' + escH(numeroExibido(r)) + '</td><td>' + escH(r.situacao_nf || (r.encontrada === false ? '—' : (r.erro || '—'))) + '</td><td>' + escH(r.situacao_imposto || '—') + '</td><td><b>' + escH(st) + '</b></td></tr>';
   }
   const html = '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>Relatório SITRAM/SEFAZ-CE</title><style>'
