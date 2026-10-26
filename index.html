@@ -21,6 +21,8 @@
   @media screen {
     #blocoResultado table { font-size: 11px; }
     #blocoResultado th, #blocoResultado td { white-space: nowrap; }
+    #blocoResultado td.keycell { font-size: 10px; }
+    #blocoResultado .keysub { display: block; font-family: ui-sans-serif, system-ui, sans-serif; font-size: 10px; color: #475569; }
   }
   @media screen and (min-width: 1024px) {
     #blocoResultado { width: calc(100vw - 48px); max-width: 1900px; margin-left: calc(50% - 50vw + 24px); }
@@ -244,9 +246,7 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
             <th class="px-2 py-2">Situação NF</th>
             <th class="px-2 py-2">Situação imposto</th>
             <th class="px-2 py-2">Status</th>
-            <th class="px-2 py-2 col-sec">Emitente</th>
             <th class="px-2 py-2 col-sec">Destinatário</th>
-            <th class="px-2 py-2 col-sec">Fato gerador</th>
             <th class="px-2 py-2 col-sec">Valor R$</th>
           </tr>
         </thead>
@@ -750,7 +750,7 @@ function renderTabela() {
   const tb = $('tbody'); tb.innerHTML = '';
   const lista = RESULTADOS.filter(passaFiltro);
   if (!lista.length) {
-    tb.innerHTML = '<tr><td colspan="10" class="px-4 py-6 text-center text-slate-400">Nenhum resultado ainda. Carregue as chaves e clique em “Consultar lote”.</td></tr>';
+    tb.innerHTML = '<tr><td colspan="8" class="px-4 py-6 text-center text-slate-400">Nenhum resultado ainda. Carregue as chaves e clique em “Consultar lote”.</td></tr>';
     if ($('pagInfo')) $('pagInfo').textContent = '';
     if ($('pagNum')) $('pagNum').textContent = '';
     return;
@@ -766,8 +766,9 @@ function renderTabela() {
     const cufBadge = cuf === '23'
       ? '<span class="px-2 py-0.5 rounded-full font-bold bg-sky-100 text-sky-800 border border-sky-200 whitespace-nowrap" title="Emitente do Ceará — não consultado">23 CE</span>'
       : `<span class="font-mono">${cuf}</span>`;
+    const sub = [emitente, fmtData(r.data_fato_gerador)].filter(v => v && v !== '—').join(' · ');
     const tr = document.createElement('tr'); tr.className = 'hover:bg-slate-50';
-    tr.innerHTML = `<td class="px-2 py-2 font-mono text-[10px] whitespace-nowrap">${esc(r.chave) || '—'}</td>` + `<td class="px-2 py-2 text-center whitespace-nowrap">${cufBadge}</td>` + `<td class="px-2 py-2 whitespace-nowrap">${esc(numeroExibido(r))}</td>` + `<td class="px-2 py-2">${esc(r.situacao_nf || (r.encontrada === false ? '—' : (r.erro || '—')))}</td>` + `<td class="px-2 py-2">${esc(r.situacao_imposto || '—')}</td>` + `<td class="px-2 py-2"><span title="${esc(dica)}" class="px-2 py-1 rounded-full font-bold ${cls}">${esc(txt)}</span></td>` + `<td class="px-2 py-2 col-sec">${esc(emitente) || '—'}</td>` + `<td class="px-2 py-2 col-sec">${esc(r.destinatario) || '—'}</td>` + `<td class="px-2 py-2 col-sec whitespace-nowrap">${esc(fmtData(r.data_fato_gerador))}</td>` + `<td class="px-2 py-2 text-right col-sec whitespace-nowrap">${esc(fmtValor(r.valor_total))}</td>`;
+    tr.innerHTML = `<td class="px-2 py-2 font-mono whitespace-nowrap keycell">${esc(r.chave) || '—'}${sub ? `<span class="keysub">${esc(sub)}</span>` : ''}</td>` + `<td class="px-2 py-2 text-center whitespace-nowrap">${cufBadge}</td>` + `<td class="px-2 py-2 whitespace-nowrap">${esc(numeroExibido(r))}</td>` + `<td class="px-2 py-2">${esc(r.situacao_nf || (r.encontrada === false ? '—' : (r.erro || '—')))}</td>` + `<td class="px-2 py-2">${esc(r.situacao_imposto || '—')}</td>` + `<td class="px-2 py-2"><span title="${esc(dica)}" class="px-2 py-1 rounded-full font-bold ${cls}">${esc(txt)}</span></td>` + `<td class="px-2 py-2 col-sec">${esc(r.destinatario) || '—'}</td>` + `<td class="px-2 py-2 text-right col-sec whitespace-nowrap">${esc(fmtValor(r.valor_total))}</td>`;
     tb.appendChild(tr);
   }
   if ($('pagInfo')) $('pagInfo').textContent = window.__printingAll ? `${lista.length} linhas (impressão: todas)` : `Mostrando ${ini + 1}–${Math.min(ini + PAG.perPage, lista.length)} de ${lista.length} (filtro) · ${RESULTADOS.length} no total`;
