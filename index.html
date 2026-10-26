@@ -18,6 +18,7 @@
   .badge-canc { background: #e5e7eb; color: #374151; }
   #log { max-height: 140px; overflow-y: auto; }
   #printHead { display: none; }
+  .clamp2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
   @page { size: A4; margin: 7mm 6mm 8mm 6mm; }
   :root{
   --hub-navy:#0f2a44; --hub-navy2:#1a3a5c; --hub-gold:#c9a227; --hub-gold2:#a8861b; --hub-goldbg:#faf4e0;
@@ -147,7 +148,7 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
       <li><strong>Cancelada separada:</strong> SITRAM devolve “não encontrada” também para NF cancelada. Agora o site lê a coluna <code>Indicadores</code> do CSV (CANCELADA/DENEGADA/AUTORIZADA) e classifica como <strong>CANCELADA</strong> sem consultar — não cai mais em “NÃO SELADA”. Resumo, filtro e export incluem a coluna.</li>
       <li><strong>Validação da chave:</strong> 44 dígitos + modelo 55 + dígito verificador (módulo 11). Chave inválida entra como <strong>INVÁLIDA</strong>, não é enviada ao SITRAM e conta em ERROS.</li>
       <li><strong>Contexto do CSV preservado:</strong> número da NF, valor, data e indicador do CSV aparecem na tabela quando o SITRAM não devolve número, e vão para o CSV/XLSX (<code>nf_csv, valor_csv, indicador_sefaz</code>).</li>
-      <li><strong>Impressão compacta:</strong> CSS próprio para A4: esconde colunas secundárias (emitente/destinatário/fato/valor), reduz fonte para 7pt e espaçamento para 2px — meta <strong>≥20 chaves por página</strong> (antes ~13). Botão imprime todas as linhas filtradas.</li>
+      <li><strong>Impressão compacta:</strong> CSS próprio para A4: esconde destinatário/fato/valor, reduz fonte para 7pt e espaçamento para 2px — emitente e data de emissão (do CSV) vão em linha fina sob a chave, meta <strong>≥20 chaves por página</strong>. Botão imprime todas as linhas filtradas.</li>
       <li><strong>Reconsulta parcial:</strong> botão <strong>Reconsultar pendentes</strong> consulta só NÃO SELADA + ERROS, sem repetir o lote todo.</li>
       <li><strong>Limitação restante:</strong> sem integração direta SEFAZ para validar cancelamento fora do CSV; sem número do DAE no retorno SITRAM — conferir valores críticos no portal oficial.</li>
     </ul>
@@ -231,16 +232,16 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
       <table class="w-full text-xs text-left">
         <thead class="bg-[#0f2a44] text-white uppercase text-[11px]">
           <tr>
-            <th class="px-3 py-2">Chave de acesso</th>
-            <th class="px-3 py-2 text-center">cUF</th>
-            <th class="px-3 py-2">NF-e</th>
-            <th class="px-3 py-2">Situação NF</th>
-            <th class="px-3 py-2">Situação imposto</th>
-            <th class="px-3 py-2">Status</th>
-            <th class="px-3 py-2 col-sec">Emitente</th>
-            <th class="px-3 py-2 col-sec">Destinatário</th>
-            <th class="px-3 py-2 col-sec">Fato gerador</th>
-            <th class="px-3 py-2 col-sec">Valor R$</th>
+            <th class="px-2 py-2">Chave de acesso</th>
+            <th class="px-2 py-2 text-center">cUF</th>
+            <th class="px-2 py-2">NF-e</th>
+            <th class="px-2 py-2">Situação NF</th>
+            <th class="px-2 py-2">Situação imposto</th>
+            <th class="px-2 py-2">Status</th>
+            <th class="px-2 py-2 col-sec">Emitente</th>
+            <th class="px-2 py-2 col-sec">Destinatário</th>
+            <th class="px-2 py-2 col-sec">Fato gerador</th>
+            <th class="px-2 py-2 col-sec">Valor R$</th>
           </tr>
         </thead>
         <tbody id="tbody" class="divide-y divide-slate-200"></tbody>
@@ -261,7 +262,7 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
         <button onclick="mudarPagina(1)" class="bg-white border border-slate-300 hover:bg-slate-100 font-bold px-3 py-1 rounded-lg">Próxima ›</button>
       </div>
     </div>
-    <p class="text-[11px] text-slate-400 px-4 py-2 nota-rodape">Regra: <strong>PAGA</strong> = “Paga/Parcelada/Déb. autuado” ou imposto “Pago”. <strong>A PAGAR</strong> = selada com imposto pendente. <strong>SEM COBRANÇA</strong> = selada, sem imposto a recolher. <strong>NÃO SELADA</strong> = portal responde “Não foram encontradas notas fiscais” — sele a nota e consulte de novo. <strong>CANCELADA</strong> = indicada no CSV como cancelada/denegada (não consultada no SITRAM). <strong>CE</strong> = cUF 23, emitente do Ceará, não consultado (só interestadual). Impressão compacta: colunas emitente/destinatário/fato/valor ocultas para caber 20+ linhas por página.</p>
+    <p class="text-[11px] text-slate-400 px-4 py-2 nota-rodape">Regra: <strong>PAGA</strong> = “Paga/Parcelada/Déb. autuado” ou imposto “Pago”. <strong>A PAGAR</strong> = selada com imposto pendente. <strong>SEM COBRANÇA</strong> = selada, sem imposto a recolher. <strong>NÃO SELADA</strong> = portal responde “Não foram encontradas notas fiscais” — sele a nota e consulte de novo. <strong>CANCELADA</strong> = indicada no CSV como cancelada/denegada (não consultada no SITRAM). <strong>CE</strong> = cUF 23, emitente do Ceará, não consultado (só interestadual). Impressão compacta: destinatário/fato/valor ocultos; emitente e data de emissão sob a chave para caber 20+ linhas por página.</p>
   </div>
 
   <footer class="hub-foot no-print">
@@ -472,10 +473,11 @@ function analisarTexto(texto, nomeArquivo) {
       else if (/DENEGAD/.test(up)) sefaz = 'DENEGADA';
       const cols = parseCamposCSV(linha);
       // layout SEFAZ destinatário: CNPJ, razão, UF, número, data, indicador, valor, chave
-      let numero_csv = '', valor_csv = '', data_csv = '', indicador_csv = sefaz;
+      let numero_csv = '', valor_csv = '', data_csv = '', indicador_csv = sefaz, emitente_csv = '';
       const idx = cols.findIndex(x => x.includes(c));
       if (idx >= 0 && cols.length >= 4) {
         numero_csv = (cols[3] || '').replace(/\D/g, '').slice(0, 9);
+        emitente_csv = cols[1] || '';
         if (cols.length >= 7) {
           indicador_csv = (cols[5] || sefaz).toUpperCase().slice(0, 30);
           if (/CANCELAD/.test(indicador_csv)) sefaz = 'CANCELADA';
@@ -484,7 +486,7 @@ function analisarTexto(texto, nomeArquivo) {
           data_csv = cols[4] || '';
         }
       }
-      INFO_MAP[c] = { arquivo: nomeArquivo || '', linha: String(linha).trim().slice(0, 500), sefaz, numero_csv, valor_csv, data_csv, indicador_csv };
+      INFO_MAP[c] = { arquivo: nomeArquivo || '', linha: String(linha).trim().slice(0, 500), sefaz, numero_csv, valor_csv, data_csv, indicador_csv, emitente_csv };
     } else {
       const linha = linhas.find(l => l.includes(c)) || '';
       if (/CANCELAD/i.test(linha)) INFO_MAP[c].sefaz = 'CANCELADA';
@@ -536,7 +538,7 @@ function adicionarChaveUnica() {
   const motivo = motivoInvalida(c);
   if (motivo) { alert('Chave inválida: ' + motivo + '.'); return; }
   if (!CHAVES.includes(c)) {
-    CHAVES.push(c); INFO_MAP[c] = { arquivo: 'manual', linha: c, sefaz: 'AUTORIZADA', numero_csv: '', valor_csv: '', data_csv: '', indicador_csv: '' }; ESTAT.lidas++;
+    CHAVES.push(c); INFO_MAP[c] = { arquivo: 'manual', linha: c, sefaz: 'AUTORIZADA', numero_csv: '', valor_csv: '', data_csv: '', indicador_csv: '', emitente_csv: '' }; ESTAT.lidas++;
     if (ehCeara(c)) log('Atenção: chave do Ceará (23) — entrará como EMITENTE CE, sem consultar SITRAM.');
   }
   $('chaveUnica').value = '';
@@ -714,6 +716,11 @@ function fmtValor(v) {
   if (v === null || v === undefined || v === '') return '—';
   return Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
+function fmtData(v) {
+  if (!v) return '—';
+  const m = String(v).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : String(v);
+}
 function mudarPagina(d) {
   const lista = RESULTADOS.filter(passaFiltro);
   const totalPag = Math.max(1, Math.ceil(lista.length / PAG.perPage));
@@ -742,10 +749,10 @@ function renderTabela() {
     const [txt, cls, dica] = classePago(r);
     const cuf = (r.chave || '').slice(0, 2) || '—';
     const cufBadge = cuf === '23'
-      ? '<span class="px-2 py-0.5 rounded-full font-bold bg-sky-100 text-sky-800 border border-sky-200" title="Emitente do Ceará — não consultado">23 CE</span>'
+      ? '<span class="px-2 py-0.5 rounded-full font-bold bg-sky-100 text-sky-800 border border-sky-200 whitespace-nowrap" title="Emitente do Ceará — não consultado">23 CE</span>'
       : `<span class="font-mono">${cuf}</span>`;
     const tr = document.createElement('tr'); tr.className = 'hover:bg-slate-50';
-    tr.innerHTML = `<td class="px-3 py-2 font-mono text-[11px]">${esc(r.chave) || '—'}</td>` + `<td class="px-3 py-2 text-center">${cufBadge}</td>` + `<td class="px-3 py-2">${esc(numeroExibido(r))}</td>` + `<td class="px-3 py-2">${esc(r.situacao_nf || (r.encontrada === false ? '—' : (r.erro || '—')))}</td>` + `<td class="px-3 py-2">${esc(r.situacao_imposto || '—')}</td>` + `<td class="px-3 py-2"><span title="${esc(dica)}" class="px-2 py-1 rounded-full font-bold ${cls}">${esc(txt)}</span></td>` + `<td class="px-3 py-2 col-sec">${esc(r.emitente) || '—'}</td>` + `<td class="px-3 py-2 col-sec">${esc(r.destinatario) || '—'}</td>` + `<td class="px-3 py-2 col-sec">${esc(r.data_fato_gerador) || '—'}</td>` + `<td class="px-3 py-2 text-right col-sec">${esc(fmtValor(r.valor_total))}</td>`;
+    tr.innerHTML = `<td class="px-2 py-2 font-mono text-[10px] whitespace-nowrap">${esc(r.chave) || '—'}</td>` + `<td class="px-2 py-2 text-center whitespace-nowrap">${cufBadge}</td>` + `<td class="px-2 py-2 whitespace-nowrap">${esc(numeroExibido(r))}</td>` + `<td class="px-2 py-2">${esc(r.situacao_nf || (r.encontrada === false ? '—' : (r.erro || '—')))}</td>` + `<td class="px-2 py-2">${esc(r.situacao_imposto || '—')}</td>` + `<td class="px-2 py-2"><span title="${esc(dica)}" class="px-2 py-1 rounded-full font-bold ${cls}">${esc(txt)}</span></td>` + `<td class="px-2 py-2 col-sec"><div class="clamp2" title="${esc(r.emitente)}">${esc(r.emitente) || '—'}</div></td>` + `<td class="px-2 py-2 col-sec"><div class="clamp2" title="${esc(r.destinatario)}">${esc(r.destinatario) || '—'}</div></td>` + `<td class="px-2 py-2 col-sec whitespace-nowrap">${esc(fmtData(r.data_fato_gerador))}</td>` + `<td class="px-2 py-2 text-right col-sec whitespace-nowrap">${esc(fmtValor(r.valor_total))}</td>`;
     tb.appendChild(tr);
   }
   if ($('pagInfo')) $('pagInfo').textContent = window.__printingAll ? `${lista.length} linhas (impressão: todas)` : `Mostrando ${ini + 1}–${Math.min(ini + PAG.perPage, lista.length)} de ${lista.length} (filtro) · ${RESULTADOS.length} no total`;
@@ -792,13 +799,17 @@ function imprimirResultado() {
   let linhas = '';
   for (const r of lista) {
     const st = classePago(r)[0];
-    linhas += '<tr><td class="mono">' + escH(r.chave || '—') + '</td><td class="c">' + escH((r.chave || '').slice(0, 2) || '—') + '</td><td>' + escH(numeroExibido(r)) + '</td><td>' + escH(r.situacao_nf || (r.encontrada === false ? '—' : (r.erro || '—'))) + '</td><td>' + escH(r.situacao_imposto || '—') + '</td><td><b>' + escH(st) + '</b></td></tr>';
+    const info = INFO_MAP[r.chave] || {};
+    const emissao = info.data_csv ? fmtData(info.data_csv) : '';
+    const sub = [r.emitente || info.emitente_csv || '', emissao ? 'Emissão ' + emissao : ''].filter(Boolean).join(' · ');
+    linhas += '<tr><td class="mono">' + escH(r.chave || '—') + (sub ? '<span class="sub">' + escH(sub) + '</span>' : '') + '</td><td class="c">' + escH((r.chave || '').slice(0, 2) || '—') + '</td><td>' + escH(numeroExibido(r)) + '</td><td>' + escH(r.situacao_nf || (r.encontrada === false ? '—' : (r.erro || '—'))) + '</td><td>' + escH(r.situacao_imposto || '—') + '</td><td><b>' + escH(st) + '</b></td></tr>';
   }
   const html = '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>Relatório SITRAM/SEFAZ-CE</title><style>'
     + 'body{font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#0f172a;margin:12px;}h1{font-size:15px;margin:0 0 2px;}p.meta{font-size:10px;color:#475569;margin:0 0 8px;}'
     + '.res{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 8px;}.res div{border:1px solid #cbd5e1;border-radius:6px;padding:4px 8px;font-size:10px;}'
     + 'table{width:100%;border-collapse:collapse;font-size:8.5pt;}th{background:#0f172a;color:#fff;padding:4px 5px;text-align:left;}td{border-bottom:1px solid #e2e8f0;padding:3px 5px;vertical-align:top;}tr{page-break-inside:avoid;}'
     + '.mono{font-family:monospace;font-size:8pt;white-space:nowrap;}.c{text-align:center;}@page{size:A4;margin:8mm 6mm;}@media print{.no-p{display:none;}}'
+    + '.sub{display:block;font-family:Arial,Helvetica,sans-serif;font-size:6.4pt;font-weight:normal;color:#475569;line-height:1.15;margin-top:1px;white-space:normal;}'
     + '</style></head><body>'
     + '<h1>Relatório SITRAM/SEFAZ-CE</h1><p class="meta">Emitido em ' + escH(dt) + ' · Filtro: ' + escH(filtroTxt) + ' · Fonte: portal-sitram.sefaz.ce.gov.br via backend (proxy)</p>'
     + '<div class="res"><div>Total: <b>' + lista.length + '</b></div><div>Pagas: <b>' + cPagas + '</b></div><div>A pagar: <b>' + cAPagar + '</b></div><div>Sem cobrança: <b>' + cSemCob + '</b></div><div>Não seladas: <b>' + cNaoEnc + '</b></div><div>CE: <b>' + cCeara + '</b></div><div>Canceladas: <b>' + cCanc + '</b></div><div>Erros: <b>' + cErros + '</b></div></div>'
