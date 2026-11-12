@@ -135,7 +135,6 @@
       <h2 class="font-bold"><i class="fa-solid fa-list-check text-slate-900 mr-1"></i>3. Chaves carregadas: <span id="countChaves">0</span></h2>
       <div class="flex gap-2 flex-wrap no-print">
         <button onclick="limparTudo()" class="bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-bold px-4 py-2 rounded-lg"><i class="fa-solid fa-trash mr-1"></i>Limpar</button>
-        <button onclick="imprimirResultado()" class="bg-white border border-slate-300 hover:bg-slate-50 text-slate-800 text-xs font-bold px-4 py-2 rounded-lg"><i class="fa-solid fa-print mr-1"></i>Imprimir Resultado</button>
         <button id="btnCancelar" onclick="cancelarConsulta()" class="bg-rose-100 hover:bg-rose-200 text-rose-700 text-xs font-bold px-4 py-2 rounded-lg hidden"><i class="fa-solid fa-stop mr-1"></i>Cancelar</button>
         <button id="btnPendentes" onclick="reconsultarPendentes()" class="bg-amber-100 hover:bg-amber-200 text-amber-800 text-xs font-bold px-4 py-2 rounded-lg" title="Consulta só NÃO SELADA + ERROS"><i class="fa-solid fa-rotate-right mr-1"></i>Reconsultar pendentes</button>
         <button id="btnConsultar" onclick="consultarLote()" class="sitram-primary text-white text-sm font-bold px-6 py-2 rounded-lg disabled:opacity-50" disabled><i class="fa-solid fa-magnifying-glass mr-1"></i>Consultar lote no SITRAM</button>
@@ -180,6 +179,7 @@
         </select>
         <button onclick="exportarCSV()" class="sitram-primary text-white font-bold px-4 py-1.5 rounded-lg"><i class="fa-solid fa-file-csv mr-1"></i>Exportar CSV</button>
         <button onclick="exportarXLSX()" class="bg-white border border-slate-300 hover:bg-slate-50 text-slate-800 font-bold px-4 py-1.5 rounded-lg"><i class="fa-solid fa-file-excel mr-1 text-emerald-700"></i>Exportar XLSX</button>
+        <button onclick="imprimirResultado()" class="bg-white border border-slate-300 hover:bg-slate-50 text-slate-800 font-bold px-4 py-1.5 rounded-lg"><i class="fa-solid fa-print mr-1"></i>Imprimir</button>
       </div>
     </div>
     <div class="overflow-x-auto">
